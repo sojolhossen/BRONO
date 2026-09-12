@@ -46,9 +46,11 @@ def main():
         sys.exit(ret.returncode)
 
     print("\n📦 Finalizing distribution package...")
-    # Ensure face.png and version.json are at root of dist/BRONO as well
+    # Ensure face.png, icon.ico and version.json are at root of dist/BRONO as well
     if (BASE_DIR / "face.png").exists():
         shutil.copy2(BASE_DIR / "face.png", DIST_DIR / "face.png")
+    if (BASE_DIR / "icon.ico").exists():
+        shutil.copy2(BASE_DIR / "icon.ico", DIST_DIR / "icon.ico")
     if (BASE_DIR / "version.json").exists():
         shutil.copy2(BASE_DIR / "version.json", DIST_DIR / "version.json")
 

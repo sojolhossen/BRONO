@@ -14,6 +14,12 @@ if _platform.system() == "Windows":
 
     _subprocess.Popen = _Popen
 
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("brono.enterprise.ai.assistant.v1")
+    except Exception:
+        pass
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Console encoding ─────────────────────────────────────────────────────────
@@ -1794,7 +1800,8 @@ def main():
 
     sys.excepthook = _crash_telemetry
 
-    ui = JarvisUI("face.png")
+    _base_dir = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+    ui = JarvisUI(str(_base_dir / "face.png"))
 
     def runner():
         ui.wait_for_api_key()

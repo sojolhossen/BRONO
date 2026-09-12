@@ -13,7 +13,7 @@ import subprocess
 import winreg
 from pathlib import Path
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QFont, QPixmap, QColor, QPainter, QPainterPath
+from PyQt6.QtGui import QFont, QPixmap, QColor, QPainter, QPainterPath, QIcon
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QFrame
 )
@@ -160,6 +160,11 @@ class InstallerWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("BRONO Enterprise — Setup Installer")
+        ico_p = Path(__file__).resolve().parent / "icon.ico"
+        if getattr(sys, "frozen", False):
+            ico_p = Path(sys._MEIPASS) / "icon.ico"
+        if ico_p.exists():
+            self.setWindowIcon(QIcon(str(ico_p)))
         self.setFixedSize(540, 360)
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowCloseButtonHint)
         self.setStyleSheet("""
@@ -308,8 +313,19 @@ class InstallerWindow(QWidget):
 
 
 def main():
+    if sys.platform == "Windows":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("brono.enterprise.installer.v1")
+        except Exception:
+            pass
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    ico_p = Path(__file__).resolve().parent / "icon.ico"
+    if getattr(sys, "frozen", False):
+        ico_p = Path(sys._MEIPASS) / "icon.ico"
+    if ico_p.exists():
+        app.setWindowIcon(QIcon(str(ico_p)))
     win = InstallerWindow()
     win.show()
     sys.exit(app.exec())

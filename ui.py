@@ -25,7 +25,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QBrush, QColor, QConicalGradient, QDragEnterEvent, QDropEvent, QFont,
-    QFontDatabase, QKeySequence, QLinearGradient, QPainter, QPainterPath,
+    QFontDatabase, QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath,
     QPen, QPixmap, QRadialGradient, QShortcut,
 )
 from PyQt6.QtWidgets import (
@@ -473,7 +473,21 @@ class HudCanvas(QWidget):
         try:
             from PIL import Image, ImageDraw
             import io
-            img = Image.open(path).convert("RGBA")
+            p = Path(path) if path else BASE_DIR / "face.png"
+            if not p.exists():
+                p = BASE_DIR / str(path)
+            if not p.exists() and getattr(sys, "frozen", False):
+                p = Path(sys._MEIPASS) / str(path)
+            if not p.exists():
+                p = BASE_DIR / "face.png"
+            if not p.exists() and getattr(sys, "frozen", False):
+                p = Path(sys._MEIPASS) / "face.png"
+
+            if not p.exists():
+                self._face_px = None
+                return
+
+            img = Image.open(str(p)).convert("RGBA")
             sz  = min(img.size)
             img = img.resize((sz, sz), Image.LANCZOS)
             mk  = Image.new("L", (sz, sz), 0)
@@ -483,7 +497,8 @@ class HudCanvas(QWidget):
             img.save(buf, format="PNG")
             px = QPixmap(); px.loadFromData(buf.getvalue())
             self._face_px = px
-        except Exception:
+        except Exception as e:
+            print(f"[UI] ⚠️ _load_face error: {e}")
             self._face_px = None
         # New source image → drop the rescaled cache so it rebuilds on next paint.
         self._face_cache    = None
@@ -3080,6 +3095,17 @@ class MainWindow(QMainWindow):
             apply_ui_accent(_ui_color)
 
         self.setWindowTitle(f"{_display} — {APP_VERSION}")
+        ico_p = BASE_DIR / "icon.ico"
+        if not ico_p.exists() and getattr(sys, "frozen", False):
+            ico_p = Path(sys._MEIPASS) / "icon.ico"
+        face_p = Path(face_path) if Path(face_path).exists() else BASE_DIR / "face.png"
+        if not face_p.exists() and getattr(sys, "frozen", False):
+            face_p = Path(sys._MEIPASS) / "face.png"
+        if ico_p.exists():
+            self.setWindowIcon(QIcon(str(ico_p)))
+        elif face_p.exists():
+            self.setWindowIcon(QIcon(str(face_p)))
+
         self.setMinimumSize(_MIN_W, _MIN_H)
         self.resize(_DEFAULT_W, _DEFAULT_H)
 
@@ -4970,8 +4996,25 @@ class _RootShim:
 
 class JarvisUI:
     def __init__(self, face_path: str, size=None):
+        if platform.system() == "Windows":
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("brono.enterprise.ai.assistant.v1")
+            except Exception:
+                pass
         self._app = QApplication.instance() or QApplication(sys.argv)
         self._app.setStyle("Fusion")
+        ico_p = BASE_DIR / "icon.ico"
+        if not ico_p.exists() and getattr(sys, "frozen", False):
+            ico_p = Path(sys._MEIPASS) / "icon.ico"
+        face_p = Path(face_path) if Path(face_path).exists() else BASE_DIR / "face.png"
+        if not face_p.exists() and getattr(sys, "frozen", False):
+            face_p = Path(sys._MEIPASS) / "face.png"
+        if ico_p.exists():
+            self._app.setWindowIcon(QIcon(str(ico_p)))
+        elif face_p.exists():
+            self._app.setWindowIcon(QIcon(str(face_p)))
+
         self._win = MainWindow(face_path)
         self.root = _RootShim(self._app)
         self._win.show()
