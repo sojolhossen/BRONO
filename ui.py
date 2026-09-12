@@ -3055,6 +3055,7 @@ class MainWindow(QMainWindow):
     _confirm_sig    = pyqtSignal(str, str)   # (title, detail) — irreversible-action gate
     _confirm_hide_sig = pyqtSignal()
     _wake_dl_sig    = pyqtSignal(bool, str)  # wake-word install finished (ok, message)
+    _broadcast_sig  = pyqtSignal(str, str, str)  # (message, level, url) — update banner from any thread
 
     def __init__(self, face_path: str):
         super().__init__()
@@ -3232,6 +3233,7 @@ class MainWindow(QMainWindow):
         QApplication.clipboard().dataChanged.connect(self._on_clipboard_changed)
 
         self._license_sig.connect(self._show_license_activation)
+        self._broadcast_sig.connect(self._on_broadcast_signal)
         self._overlay: SetupOverlay | None = None
         self._license_overlay: LicenseActivationOverlay | None = None
         self._license_ready = self._check_license()
@@ -4877,6 +4879,12 @@ class MainWindow(QMainWindow):
             self._ready = True
             self._apply_state("LISTENING")
 
+    def _on_broadcast_signal(self, message: str, level: str, url: str):
+        if message:
+            self.show_broadcast(message, level, url)
+        else:
+            self.hide_broadcast()
+
     def show_broadcast(self, message: str, level: str = "info", url: str = ""):
         if hasattr(self, "_broadcast_bar"):
             self._broadcast_url = url
@@ -5085,7 +5093,9 @@ class JarvisUI:
         self._win._license_sig.emit(reason)
 
     def update_broadcast(self, message: str, level: str = "info", url: str = ""):
-        if message:
+        if hasattr(self._win, "_broadcast_sig"):
+            self._win._broadcast_sig.emit(message, level, url)
+        elif message:
             self._win.show_broadcast(message, level, url)
         else:
             self._win.hide_broadcast()

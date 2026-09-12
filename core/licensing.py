@@ -392,9 +392,12 @@ def is_feature_enabled(name: str) -> bool:
     key = f"feature_{name}"
     return bool(_REMOTE_CONFIG.get(key, True))
 
-def check_for_updates(current_version: str = "1.0.0") -> dict | None:
+CURRENT_APP_VERSION = "1.0.0"
+
+def check_for_updates(current_version: str = CURRENT_APP_VERSION) -> dict | None:
     """
-    Checks both Render Fleet server and GitHub Releases API for new updates.
+    Checks GitHub Releases & version.json directly (Option 2) with fallback to Fleet server.
+    Rate-limit immune: queries raw GitHub/CDN version.json and release web redirects.
     Returns update info dict if a newer version exists, else None.
     """
     def _is_newer(v_latest: str, v_cur: str) -> bool:
@@ -405,27 +408,60 @@ def check_for_updates(current_version: str = "1.0.0") -> dict | None:
         except Exception:
             return v_latest != v_cur and bool(v_latest)
 
-    # 1. Check Fleet server remote_config (set by admin via Render dashboard)
-    latest_ver = _REMOTE_CONFIG.get("latest_app_version", "").strip()
-    download_url = _REMOTE_CONFIG.get("download_url", "").strip()
-    release_notes = _REMOTE_CONFIG.get("release_notes", "").strip()
+    # ── Source 1: GitHub Raw version.json & jsDelivr CDN (Instant, 0 rate-limits) ──
+    raw_urls = [
+        "https://raw.githubusercontent.com/sojolhossen/BRONO/main/version.json",
+        "https://cdn.jsdelivr.net/gh/sojolhossen/BRONO@main/version.json",
+    ]
+    for r_url in raw_urls:
+        try:
+            req = urllib.request.Request(
+                r_url,
+                headers={"User-Agent": "BRONO-Client/1.0", "Cache-Control": "no-cache"}
+            )
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    v = str(data.get("version", "")).strip()
+                    if v and _is_newer(v, current_version):
+                        return {
+                            "has_update": True,
+                            "latest_version": v,
+                            "download_url": data.get("download_url") or "https://github.com/sojolhossen/BRONO/releases/latest",
+                            "release_notes": data.get("release_notes", ""),
+                            "source": "github_raw",
+                        }
+        except Exception:
+            continue
 
-    if latest_ver and _is_newer(latest_ver, current_version):
-        return {
-            "has_update": True,
-            "latest_version": latest_ver,
-            "download_url": download_url or "https://github.com/sojolhossen/BRONO/releases",
-            "release_notes": release_notes,
-            "source": "fleet",
-        }
+    # ── Source 2: GitHub Releases Web Redirect (0 rate-limits, checks published release tag) ──
+    try:
+        req = urllib.request.Request(
+            "https://github.com/sojolhossen/BRONO/releases/latest",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            final_url = resp.geturl()
+            if "/releases/tag/" in final_url:
+                tag = final_url.split("/releases/tag/")[-1].strip().lstrip("v")
+                if tag and _is_newer(tag, current_version):
+                    return {
+                        "has_update": True,
+                        "latest_version": tag,
+                        "download_url": final_url,
+                        "release_notes": f"New release {tag} available on GitHub.",
+                        "source": "github_web",
+                    }
+    except Exception:
+        pass
 
-    # 2. Check GitHub Releases API directly as automatic fallback
+    # ── Source 3: GitHub REST API (Standard releases endpoint) ──
     try:
         gh_req = urllib.request.Request(
             "https://api.github.com/repos/sojolhossen/BRONO/releases/latest",
             headers={"User-Agent": "BRONO-Client/1.0", "Accept": "application/vnd.github.v3+json"}
         )
-        with urllib.request.urlopen(gh_req, timeout=6) as resp:
+        with urllib.request.urlopen(gh_req, timeout=5) as resp:
             gh_data = json.loads(resp.read().decode("utf-8"))
             tag = gh_data.get("tag_name", "").lstrip("v").strip()
             if tag and _is_newer(tag, current_version):
@@ -436,9 +472,22 @@ def check_for_updates(current_version: str = "1.0.0") -> dict | None:
                     "latest_version": tag,
                     "download_url": d_url,
                     "release_notes": gh_data.get("body", ""),
-                    "source": "github",
+                    "source": "github_api",
                 }
     except Exception:
         pass
+
+    # ── Source 4: Fleet Server remote_config (Admin dashboard fallback) ──
+    latest_ver = _REMOTE_CONFIG.get("latest_app_version", "").strip()
+    download_url = _REMOTE_CONFIG.get("download_url", "").strip()
+    release_notes = _REMOTE_CONFIG.get("release_notes", "").strip()
+    if latest_ver and _is_newer(latest_ver, current_version):
+        return {
+            "has_update": True,
+            "latest_version": latest_ver,
+            "download_url": download_url or "https://github.com/sojolhossen/BRONO/releases",
+            "release_notes": release_notes,
+            "source": "fleet",
+        }
 
     return None

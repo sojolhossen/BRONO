@@ -1523,10 +1523,10 @@ class JarvisLive:
 
     async def _licensing_heartbeat_loop(self):
         """Periodic fleet heartbeat to sync with admin server, check updates and remote flags."""
-        from core.licensing import heartbeat, get_remote_broadcast, check_for_updates
+        from core.licensing import heartbeat, get_remote_broadcast, check_for_updates, CURRENT_APP_VERSION
 
         async def _check_and_notify():
-            upd = await asyncio.to_thread(check_for_updates, "1.0.0")
+            upd = await asyncio.to_thread(check_for_updates, CURRENT_APP_VERSION)
             if upd and upd.get("has_update"):
                 v = upd["latest_version"]
                 url = upd.get("download_url", "")
