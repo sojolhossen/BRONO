@@ -16,7 +16,8 @@ from pydantic import BaseModel
 from .models import init_db, get_db
 from .crypto import (
     generate_license_key, hash_password, verify_password,
-    sign_activation_payload, verify_activation_token
+    sign_activation_payload, verify_activation_token,
+    sign_admin_session, verify_admin_session
 )
 
 app = FastAPI(title="BRONO Enterprise Licensing Platform", version="1.0.0")
@@ -37,11 +38,9 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Session & Auth Helper ───────────────────────────────────────────────────
-ADMIN_SESSIONS: set[str] = set()
-
 def require_admin(request: Request):
     token = request.cookies.get("brono_admin_session")
-    if not token or token not in ADMIN_SESSIONS:
+    if not token or not verify_admin_session(token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return token
 
@@ -313,23 +312,19 @@ def admin_login(req: LoginRequest, response: Response):
     if not row or not verify_password(req.password, row["password_hash"]):
         raise HTTPException(status_code=400, detail="Invalid username or password.")
 
-    import secrets
-    session_token = secrets.token_hex(24)
-    ADMIN_SESSIONS.add(session_token)
+    session_token = sign_admin_session(req.username.strip(), days=30)
     response.set_cookie(
         key="brono_admin_session",
         value=session_token,
         httponly=True,
-        max_age=86400 * 7,  # 7 days
+        max_age=86400 * 30,  # 30 days
         samesite="lax",
     )
     return {"success": True, "message": "Login successful."}
 
 
 @app.post("/api/admin/logout")
-def admin_logout(response: Response, token: str = Depends(require_admin)):
-    if token in ADMIN_SESSIONS:
-        ADMIN_SESSIONS.remove(token)
+def admin_logout(response: Response):
     response.delete_cookie("brono_admin_session")
     return {"success": True}
 

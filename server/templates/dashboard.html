@@ -1146,6 +1146,11 @@
 
       try {
         const res = await fetch(`/api/admin/licenses/${id}/action?action=${action}`, { method: 'POST' });
+        if (res.status === 401) {
+          showToast('Session expired. Redirecting to login...');
+          setTimeout(() => { window.location.href = '/login'; }, 800);
+          return;
+        }
         const data = await res.json();
         if (data.success) {
           showToast(`License action '${action}' completed.`);
@@ -1177,6 +1182,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+        if (res.status === 401) {
+          showToast('Session expired. Redirecting to login...');
+          setTimeout(() => { window.location.href = '/login'; }, 800);
+          return;
+        }
         const data = await res.json();
         if (data.success) {
           document.getElementById('modal-keys-output').value = data.created_keys.join('\n');
@@ -1249,6 +1259,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+        if (res.status === 401) {
+          showToast('Session expired. Redirecting to login...');
+          setTimeout(() => { window.location.href = '/login'; }, 800);
+          return;
+        }
         const data = await res.json();
         if (data.success) {
           showToast('Fleet settings deployed to all clients!');

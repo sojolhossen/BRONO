@@ -54,3 +54,26 @@ def verify_activation_token(token: str) -> dict | None:
         return json.loads(payload_json)
     except Exception:
         return None
+
+def sign_admin_session(username: str, days: int = 30) -> str:
+    """Creates a cryptographic stateless admin session token valid for `days` days."""
+    payload = {
+        "user": username,
+        "exp": (datetime.utcnow() + timedelta(days=days)).isoformat()
+    }
+    return sign_activation_payload(payload)
+
+def verify_admin_session(token: str) -> str | None:
+    """Verifies HMAC signature of admin session token and returns username if valid."""
+    data = verify_activation_token(token)
+    if not data:
+        return None
+    exp = data.get("exp")
+    if exp:
+        try:
+            if datetime.utcnow() > datetime.fromisoformat(exp):
+                return None
+        except Exception:
+            return None
+    return data.get("user")
+
