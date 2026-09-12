@@ -391,3 +391,54 @@ def get_remote_broadcast() -> dict:
 def is_feature_enabled(name: str) -> bool:
     key = f"feature_{name}"
     return bool(_REMOTE_CONFIG.get(key, True))
+
+def check_for_updates(current_version: str = "1.0.0") -> dict | None:
+    """
+    Checks both Render Fleet server and GitHub Releases API for new updates.
+    Returns update info dict if a newer version exists, else None.
+    """
+    def _is_newer(v_latest: str, v_cur: str) -> bool:
+        try:
+            p_latest = [int(x) for x in v_latest.lstrip("v").split(".")]
+            p_cur = [int(x) for x in v_cur.lstrip("v").split(".")]
+            return p_latest > p_cur
+        except Exception:
+            return v_latest != v_cur and bool(v_latest)
+
+    # 1. Check Fleet server remote_config (set by admin via Render dashboard)
+    latest_ver = _REMOTE_CONFIG.get("latest_app_version", "").strip()
+    download_url = _REMOTE_CONFIG.get("download_url", "").strip()
+    release_notes = _REMOTE_CONFIG.get("release_notes", "").strip()
+
+    if latest_ver and _is_newer(latest_ver, current_version):
+        return {
+            "has_update": True,
+            "latest_version": latest_ver,
+            "download_url": download_url or "https://github.com/sojolhossen/BRONO/releases",
+            "release_notes": release_notes,
+            "source": "fleet",
+        }
+
+    # 2. Check GitHub Releases API directly as automatic fallback
+    try:
+        gh_req = urllib.request.Request(
+            "https://api.github.com/repos/sojolhossen/BRONO/releases/latest",
+            headers={"User-Agent": "BRONO-Client/1.0", "Accept": "application/vnd.github.v3+json"}
+        )
+        with urllib.request.urlopen(gh_req, timeout=6) as resp:
+            gh_data = json.loads(resp.read().decode("utf-8"))
+            tag = gh_data.get("tag_name", "").lstrip("v").strip()
+            if tag and _is_newer(tag, current_version):
+                assets = gh_data.get("assets", [])
+                d_url = assets[0]["browser_download_url"] if assets else gh_data.get("html_url", "")
+                return {
+                    "has_update": True,
+                    "latest_version": tag,
+                    "download_url": d_url,
+                    "release_notes": gh_data.get("body", ""),
+                    "source": "github",
+                }
+    except Exception:
+        pass
+
+    return None

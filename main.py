@@ -1522,8 +1522,23 @@ class JarvisLive:
                 await asyncio.sleep(0.5)
 
     async def _licensing_heartbeat_loop(self):
-        """Periodic fleet heartbeat to sync with admin server and check remote flags."""
-        from core.licensing import heartbeat, get_remote_broadcast
+        """Periodic fleet heartbeat to sync with admin server, check updates and remote flags."""
+        from core.licensing import heartbeat, get_remote_broadcast, check_for_updates
+
+        async def _check_and_notify():
+            upd = await asyncio.to_thread(check_for_updates, "1.0.0")
+            if upd and upd.get("has_update"):
+                v = upd["latest_version"]
+                url = upd.get("download_url", "")
+                self.ui.update_broadcast(f"🚀 New Update Available: v{v}!", "update", url)
+                return True
+            bc = get_remote_broadcast()
+            if bc and bc.get("message"):
+                self.ui.update_broadcast(bc["message"], bc.get("level", "info"))
+                return True
+            self.ui.update_broadcast("")
+            return False
+
         # Initial heartbeat immediately on startup
         try:
             res = await asyncio.to_thread(heartbeat)
@@ -1531,9 +1546,7 @@ class JarvisLive:
                 self.ui.write_log("ERR: License suspended or revoked by administrator.")
                 self.ui.trigger_license_gate("REVOKED")
             else:
-                bc = get_remote_broadcast()
-                if bc and bc.get("message"):
-                    self.ui.update_broadcast(bc["message"], bc.get("level", "info"))
+                await _check_and_notify()
         except Exception:
             pass
 
@@ -1550,11 +1563,7 @@ class JarvisLive:
                             self._reconnect_event.set()
                     break
 
-                bc = get_remote_broadcast()
-                if bc and bc.get("message"):
-                    self.ui.update_broadcast(bc["message"], bc.get("level", "info"))
-                else:
-                    self.ui.update_broadcast("")
+                await _check_and_notify()
             except Exception:
                 pass
 

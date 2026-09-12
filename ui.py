@@ -3106,10 +3106,17 @@ class MainWindow(QMainWindow):
         root.addWidget(self._build_header())
 
         self._broadcast_bar = QLabel("")
-        self._broadcast_bar.setFixedHeight(24)
+        self._broadcast_bar.setFixedHeight(26)
         self._broadcast_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._broadcast_bar.setFont(get_font(8, bold=True, mono=True))
         self._broadcast_bar.hide()
+        self._broadcast_url = ""
+        def _on_bc_click(ev):
+            u = getattr(self, "_broadcast_url", "")
+            if u:
+                import webbrowser
+                webbrowser.open(u)
+        self._broadcast_bar.mousePressEvent = _on_bc_click
         root.addWidget(self._broadcast_bar)
 
         body = QHBoxLayout()
@@ -4870,12 +4877,23 @@ class MainWindow(QMainWindow):
             self._ready = True
             self._apply_state("LISTENING")
 
-    def show_broadcast(self, message: str, level: str = "info"):
+    def show_broadcast(self, message: str, level: str = "info", url: str = ""):
         if hasattr(self, "_broadcast_bar"):
-            color = C.PRI if level == "info" else (C.ACC2 if level == "warning" else C.RED)
-            bg = "rgba(0, 229, 255, 0.12)" if level == "info" else ("rgba(255, 184, 0, 0.12)" if level == "warning" else "rgba(255, 42, 109, 0.18)")
-            self._broadcast_bar.setText(f"📢  {message}")
+            self._broadcast_url = url
+            colors = {
+                "info": (C.PRI, "rgba(0, 229, 255, 0.12)"),
+                "warning": (C.ACC2, "rgba(255, 184, 0, 0.12)"),
+                "critical": (C.RED, "rgba(255, 42, 109, 0.18)"),
+                "update": (C.GREEN, "rgba(0, 255, 128, 0.18)"),
+            }
+            color, bg = colors.get(level, colors["info"])
+            suffix = "  [📥 Click to Download & Update]" if url else ""
+            self._broadcast_bar.setText(f"📢  {message}{suffix}")
             self._broadcast_bar.setStyleSheet(f"background: {bg}; color: {color}; border-bottom: 1px solid {color}; padding: 2px 10px;")
+            if url:
+                self._broadcast_bar.setCursor(Qt.CursorShape.PointingHandCursor)
+            else:
+                self._broadcast_bar.setCursor(Qt.CursorShape.ArrowCursor)
             self._broadcast_bar.show()
 
     def hide_broadcast(self):
@@ -5066,9 +5084,9 @@ class JarvisUI:
         self._win._ready = False
         self._win._license_sig.emit(reason)
 
-    def update_broadcast(self, message: str, level: str = "info"):
+    def update_broadcast(self, message: str, level: str = "info", url: str = ""):
         if message:
-            self._win.show_broadcast(message, level)
+            self._win.show_broadcast(message, level, url)
         else:
             self._win.hide_broadcast()
 

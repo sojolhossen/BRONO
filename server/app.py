@@ -254,6 +254,9 @@ def client_heartbeat(req: HeartbeatRequest):
             "feature_wake_word": bool(remote_cfg.get("feature_wake_word", 1)),
             "feature_plugins": bool(remote_cfg.get("feature_plugins", 1)),
             "latest_app_version": remote_cfg.get("latest_app_version", "1.0.0"),
+            "min_app_version": remote_cfg.get("min_app_version", "1.0.0"),
+            "download_url": remote_cfg.get("download_url", ""),
+            "release_notes": remote_cfg.get("release_notes", ""),
         }
     }
 
