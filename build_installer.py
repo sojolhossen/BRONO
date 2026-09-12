@@ -54,8 +54,10 @@ def main():
         "--onefile",
         "--windowed",
         "--name", "BRONO_Setup",
+        "--icon", "icon.ico",
         "--add-data", f"payload.zip;.",
         "--add-data", f"face.png;.",
+        "--add-data", f"icon.ico;.",
         "installer_gui.py"
     ]
     ret = subprocess.run(cmd, cwd=BASE_DIR)
