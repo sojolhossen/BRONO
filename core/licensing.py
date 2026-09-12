@@ -29,8 +29,8 @@ CONFIG_DIR = BASE_DIR / "config"
 LICENSE_FILE = CONFIG_DIR / "license.dat"
 CONFIG_FILE = CONFIG_DIR / "api_keys.json"
 
-# Default Licensing Server URL — can be overwritten in config/api_keys.json
-DEFAULT_SERVER_URL = "http://localhost:8080"
+# Default Licensing Server URL — Live on Render.com (24/7 Cloud)
+DEFAULT_SERVER_URL = "https://brono.onrender.com"
 # Client HMAC key matching server
 CLIENT_VERIFY_KEY = b"BRONO_ENTERPRISE_SECRET_KEY_99218_SECURE_HMAC"
 
