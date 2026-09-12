@@ -46,7 +46,7 @@ PROMPT_MAX_PER_CATEGORY = 6
 
 def _empty_memory() -> dict:
     return {
-        "identity":      {},
+        "identity":      {"language": {"value": "Bengali", "updated": datetime.now().strftime("%Y-%m-%d")}},
         "preferences":   {},
         "projects":      {},
         "relationships": {},

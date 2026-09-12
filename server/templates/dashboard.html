@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BRONO Enterprise Fleet Control & Licensing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #06090f;
+      --bg-surface: #0c1322;
+      --bg-card: rgba(16, 26, 46, 0.85);
+      --bg-card-hover: rgba(22, 36, 64, 0.95);
+      --border: rgba(0, 229, 255, 0.15);
+      --border-bright: rgba(0, 229, 255, 0.4);
+      --cyan: #00e5ff;
+      --cyan-glow: rgba(0, 229, 255, 0.35);
+      --emerald: #00ff9d;
+      --emerald-glow: rgba(0, 255, 157, 0.3);
+      --rose: #ff2a6d;
+      --rose-glow: rgba(255, 42, 109, 0.3);
+      --amber: #ffb800;
+      --amber-glow: rgba(255, 184, 0, 0.3);
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --font-main: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(circle at 10% 15%, rgba(0, 229, 255, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 85%, rgba(0, 255, 157, 0.04) 0%, transparent 40%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+    }
+
+    /* Top Navigation */
+    header {
+      background: rgba(12, 19, 34, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #00e5ff, #0077ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px var(--cyan-glow);
+      font-weight: 800;
+      font-size: 20px;
+      color: #000;
+    }
+
+    .brand-text h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: #fff;
+    }
+
+    .brand-text span {
+      font-size: 11px;
+      color: var(--cyan);
+      letter-spacing: 2px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 255, 157, 0.1);
+      border: 1px solid rgba(0, 255, 157, 0.3);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--emerald);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+
+    .btn-logout {
+      background: rgba(255, 42, 109, 0.12);
+      border: 1px solid rgba(255, 42, 109, 0.3);
+      color: #ff5c8a;
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-logout:hover {
+      background: rgba(255, 42, 109, 0.25);
+      border-color: var(--rose);
+      color: #fff;
+    }
+
+    /* Container Layout */
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 28px 32px;
+      flex: 1;
+      width: 100%;
+    }
+
+    /* KPI Metrics Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .metric-card:hover {
+      border-color: var(--border-bright);
+      transform: translateY(-2px);
+    }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-color, var(--cyan)), transparent);
+    }
+    .metric-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .metric-value {
+      font-size: 32px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: #fff;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .metric-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* Navigation Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 8px 8px 0 0;
+      position: relative;
+      transition: all 0.2s;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .tab-btn.active {
+      color: var(--cyan);
+      background: rgba(0, 229, 255, 0.06);
+    }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+    }
+
+    /* Tab Content Panels */
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.25s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Card Panels */
+    .panel-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+      margin-bottom: 24px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+      border: none;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #00e5ff, #0077ff);
+      color: #050a14;
+      font-weight: 700;
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 0 25px rgba(0, 229, 255, 0.5);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+    .btn-danger {
+      background: rgba(255, 42, 109, 0.15);
+      border: 1px solid rgba(255, 42, 109, 0.3);
+      color: #ff5c8a;
+    }
+    .btn-danger:hover {
+      background: rgba(255, 42, 109, 0.28);
+      color: #fff;
+    }
+    .btn-warning {
+      background: rgba(255, 184, 0, 0.15);
+      border: 1px solid rgba(255, 184, 0, 0.3);
+      color: #ffc833;
+    }
+    .btn-warning:hover {
+      background: rgba(255, 184, 0, 0.28);
+      color: #fff;
+    }
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 11px;
+      border-radius: 6px;
+    }
+
+    /* Filter & Search Bar */
+    .table-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .input-field {
+      background: rgba(6, 12, 22, 0.8);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: 8px;
+      padding: 8px 14px;
+      color: #fff;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-field:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    select.input-field {
+      cursor: pointer;
+    }
+
+    /* Table Styles */
+    .table-container {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th {
+      background: rgba(12, 20, 36, 0.95);
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 12px 16px;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text);
+    }
+
+    tr:hover td {
+      background: rgba(0, 229, 255, 0.02);
+    }
+
+    .key-badge {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--cyan);
+      background: rgba(0, 229, 255, 0.08);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .copy-btn {
+      cursor: pointer;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+    .copy-btn:hover { opacity: 1; }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-active {
+      background: rgba(0, 255, 157, 0.12);
+      color: var(--emerald);
+      border: 1px solid rgba(0, 255, 157, 0.3);
+    }
+    .status-revoked {
+      background: rgba(255, 42, 109, 0.12);
+      color: var(--rose);
+      border: 1px solid rgba(255, 42, 109, 0.3);
+    }
+    .status-expired {
+      background: rgba(255, 184, 0, 0.12);
+      color: var(--amber);
+      border: 1px solid rgba(255, 184, 0, 0.3);
+    }
+
+    .plan-badge {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+
+    /* Forms Grid */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    textarea.input-field {
+      min-height: 100px;
+      resize: vertical;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    /* Switch Component */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(6, 12, 22, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(255, 255, 255, 0.15);
+      transition: .3s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: var(--cyan);
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+      background-color: #060c16;
+    }
+
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+
+    .modal-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-bright);
+      border-radius: 14px;
+      max-width: 600px;
+      width: 100%;
+      padding: 24px;
+      box-shadow: 0 0 40px rgba(0, 229, 255, 0.2);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; color: #fff; }
+    .btn-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .btn-close:hover { color: #fff; }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-bright);
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* Device details list */
+    .device-pill {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-top: 4px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">B</div>
+      <div class="brand-text">
+        <h1>BRONO ENTERPRISE</h1>
+        <span>Fleet Licensing Platform</span>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <div class="status-pill">
+        <div class="status-dot"></div>
+        <span>FLEET SERVER ONLINE</span>
+      </div>
+      <button class="btn-logout" onclick="logout()">Sign Out</button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- KPI Metric Cards -->
+    <div class="metrics-grid">
+      <div class="metric-card" style="--accent-color: var(--cyan)">
+        <div class="metric-label">Total Licenses</div>
+        <div class="metric-value" id="kpi-total-licenses">--</div>
+        <div class="metric-sub" id="kpi-active-licenses">-- Active</div>
+      </div>
+      <div class="metric-card" style="--accent-color: var(--emerald)">
+        <div class="metric-label">Registered PC Hardware</div>
+        <div class="metric-value" id="kpi-total-devices">--</div>
+        <div class="metric-sub">Protected by HWID Anti-Piracy</div>
+      </div>
+      <div class="metric-card" style="--accent-color: var(--amber)">
+        <div class="metric-label">Plan Distribution</div>
+        <div class="metric-value" style="font-size: 18px; gap: 6px;" id="kpi-plan-dist">
+          --
+        </div>
+        <div class="metric-sub">Tier allocations</div>
+      </div>
+      <div class="metric-card" style="--accent-color: var(--rose)">
+        <div class="metric-label">Crash Telemetry</div>
+        <div class="metric-value" id="kpi-total-crashes">--</div>
+        <div class="metric-sub">Client reported events</div>
+      </div>
+    </div>
+
+    <!-- Main Navigation Tabs -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('licenses')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        License & HWID Vault
+      </button>
+      <button class="tab-btn" onclick="switchTab('create')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Issue New Keys
+      </button>
+      <button class="tab-btn" onclick="switchTab('remote')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Fleet Control & Broadcast
+      </button>
+      <button class="tab-btn" onclick="switchTab('releases')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Software Releases & OTA
+      </button>
+      <button class="tab-btn" onclick="switchTab('telemetry')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Telemetry Logs
+      </button>
+    </div>
+
+    <!-- TAB 1: LICENSES TABLE -->
+    <div id="tab-licenses" class="tab-content active">
+      <div class="panel-box">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>Customer Licenses</span>
+            <button class="btn btn-secondary btn-sm" onclick="loadLicenses()">Refresh</button>
+          </div>
+          <div class="table-controls">
+            <input type="text" id="license-search" class="input-field" placeholder="Search Key, Customer..." oninput="filterLicenses()">
+            <select id="license-filter-status" class="input-field" onchange="filterLicenses()">
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="revoked">Revoked</option>
+              <option value="expired">Expired</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="switchTab('create')">+ Issue Key</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>License Key</th>
+                <th>Customer</th>
+                <th>Plan</th>
+                <th>Bound Hardware (HWID)</th>
+                <th>Expires</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="licenses-tbody">
+              <tr><td colspan="7" style="text-align:center; padding: 40px; color: var(--text-muted);">Loading license vault...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: CREATE LICENSE -->
+    <div id="tab-create" class="tab-content">
+      <div class="panel-box" style="max-width: 800px; margin: 0 auto;">
+        <div class="panel-header">
+          <div class="panel-title">Generate Customer License Keys</div>
+        </div>
+        <form onsubmit="handleCreateLicense(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Key Quantity (Bulk Generation)</label>
+              <input type="number" id="gen-count" class="input-field" value="1" min="1" max="100" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Subscription / License Plan</label>
+              <select id="gen-plan" class="input-field" onchange="handlePlanChange()">
+                <option value="lifetime">Lifetime License</option>
+                <option value="annual">Annual License (365 Days)</option>
+                <option value="monthly">Monthly License (30 Days)</option>
+                <option value="trial">Trial (7 Days)</option>
+                <option value="enterprise">Enterprise Custom</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Max Allowed Devices (PC Locks)</label>
+              <input type="number" id="gen-max-devices" class="input-field" value="1" min="1" max="10" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Custom Duration in Days (Optional)</label>
+              <input type="number" id="gen-duration" class="input-field" placeholder="Leave empty for plan default">
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Customer Name</label>
+              <input type="text" id="gen-customer-name" class="input-field" placeholder="e.g. John Doe / Acme Corp">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Customer Email</label>
+              <input type="email" id="gen-customer-email" class="input-field" placeholder="customer@domain.com">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Internal Notes / Payment Reference</label>
+            <input type="text" id="gen-notes" class="input-field" placeholder="e.g. bKash TrxID #8921827 / WhatsApp Order">
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px;">
+            ⚡ Generate Cryptographic License Keys
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB 3: FLEET REMOTE CONTROL & BROADCAST -->
+    <div id="tab-remote" class="tab-content">
+      <div class="panel-box">
+        <div class="panel-header">
+          <div class="panel-title">Fleet-Wide Remote Control & Overrides</div>
+          <button class="btn btn-primary" onclick="saveFleetConfig()">Deploy Remote Configuration</button>
+        </div>
+
+        <div class="form-grid">
+          <!-- Broadcast Announcement Banner -->
+          <div>
+            <h3 style="font-size: 14px; margin-bottom: 12px; color: var(--cyan);">HUD Broadcast Announcement Banner</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+              Instantly push a live banner to every active desktop assistant's screen.
+            </p>
+            
+            <div class="switch-row">
+              <span>Enable HUD Broadcast Message</span>
+              <label class="switch">
+                <input type="checkbox" id="cfg-broadcast-active">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Broadcast Text</label>
+              <input type="text" id="cfg-broadcast-msg" class="input-field" placeholder="e.g. ⚠️ Scheduled maintenance today at 11:00 PM">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Severity Level</label>
+              <select id="cfg-broadcast-level" class="input-field">
+                <option value="info">Info (Cyan HUD)</option>
+                <option value="warning">Warning (Amber Alert)</option>
+                <option value="critical">Critical (Rose Red Notice)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Feature Flags -->
+          <div>
+            <h3 style="font-size: 14px; margin-bottom: 12px; color: var(--cyan);">Global Feature Flags</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+              Remotely enable or disable heavy modules across all client installations.
+            </p>
+
+            <div class="switch-row">
+              <span>Vision / Screen OCR Engine</span>
+              <label class="switch">
+                <input type="checkbox" id="cfg-feat-vision" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <span>Real-Time Web Search</span>
+              <label class="switch">
+                <input type="checkbox" id="cfg-feat-search" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <span>Phone Mobile Dashboard Companion</span>
+              <label class="switch">
+                <input type="checkbox" id="cfg-feat-phone" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <span>Background Wake-Word Detection</span>
+              <label class="switch">
+                <input type="checkbox" id="cfg-feat-wake" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <span>Custom Action Plugins</span>
+              <label class="switch">
+                <input type="checkbox" id="cfg-feat-plugins" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Over-The-Air System Prompt Override -->
+        <div style="margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 20px;">
+          <h3 style="font-size: 14px; margin-bottom: 8px; color: var(--cyan);">OTA System Prompt Injection (Optional)</h3>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+            Inject extra behavioral rules or greetings into every client without rebuilding the .exe. Leave empty to use client local prompt.txt.
+          </p>
+          <textarea id="cfg-system-prompt" class="input-field" placeholder="Optional system prompt rules to append..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: SOFTWARE RELEASES & OTA -->
+    <div id="tab-releases" class="tab-content">
+      <div class="panel-box" style="max-width: 800px; margin: 0 auto;">
+        <div class="panel-header">
+          <div class="panel-title">Software Releases & Update Manager</div>
+          <button class="btn btn-primary" onclick="saveFleetConfig()">Publish Release Notification</button>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Latest Published Version</label>
+            <input type="text" id="cfg-latest-ver" class="input-field" placeholder="1.0.1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Minimum Required Version</label>
+            <input type="text" id="cfg-min-ver" class="input-field" placeholder="1.0.0">
+            <small style="color: var(--text-muted); font-size: 11px;">Clients below this will be prompted to update before launching.</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">New Installer / Update Download URL</label>
+          <input type="url" id="cfg-download-url" class="input-field" placeholder="https://github.com/yourname/brono-releases/releases/download/v1.0.1/BRONO_Setup.exe">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Release Notes & Changelog</label>
+          <textarea id="cfg-release-notes" class="input-field" placeholder="- Added Bangladesh real-time news radar&#10;- Improved speech synthesis responsiveness&#10;- Fixed memory persistence"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: TELEMETRY -->
+    <div id="tab-telemetry" class="tab-content">
+      <div class="panel-box">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>Client Crash Reports & Telemetry</span>
+            <button class="btn btn-secondary btn-sm" onclick="loadTelemetry()">Refresh</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>License Key</th>
+                <th>Hardware ID (HWID)</th>
+                <th>Version</th>
+                <th>Error Message</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="telemetry-tbody">
+              <tr><td colspan="6" style="text-align:center; padding: 40px; color: var(--text-muted);">No crash incidents logged. Fleet is healthy.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Generated Keys Output Modal -->
+  <div id="keys-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">🎉 License Keys Generated</div>
+        <button class="btn-close" onclick="closeModal('keys-modal')">&times;</button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+        Share these keys with your customers. Each key will automatically lock to their machine on first activation.
+      </p>
+      <textarea id="modal-keys-output" class="input-field" style="height: 180px; width: 100%; margin-bottom: 16px;" readonly></textarea>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-secondary" onclick="copyModalKeys()">Copy All Keys</button>
+        <button class="btn btn-primary" onclick="closeModal('keys-modal'); switchTab('licenses');">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification element -->
+  <div id="toast">Message</div>
+
+  <!-- Script Logic -->
+  <script>
+    let ALL_LICENSES = [];
+
+    // Toast helper
+    function showToast(msg, duration = 3000) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), duration);
+    }
+
+    // Tab switcher
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+      const targetBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (targetBtn) targetBtn.classList.add('active');
+
+      const targetContent = document.getElementById(`tab-${tabId}`);
+      if (targetContent) targetContent.classList.add('active');
+
+      if (tabId === 'licenses') loadLicenses();
+      if (tabId === 'remote' || tabId === 'releases') loadFleetConfig();
+      if (tabId === 'telemetry') loadTelemetry();
+    }
+
+    // Copy to clipboard
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard: ' + text);
+      });
+    }
+
+    function copyModalKeys() {
+      const text = document.getElementById('modal-keys-output').value;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('All generated keys copied to clipboard!');
+      });
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    // Fetch Stats
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/admin/stats');
+        if (res.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        const data = await res.json();
+        document.getElementById('kpi-total-licenses').innerText = data.total_licenses || 0;
+        document.getElementById('kpi-active-licenses').innerText = `${data.active_licenses || 0} Active`;
+        document.getElementById('kpi-total-devices').innerText = data.total_devices || 0;
+        document.getElementById('kpi-total-crashes').innerText = data.total_crashes || 0;
+
+        // Plan distribution
+        const dist = data.plan_distribution || {};
+        const distBadges = Object.entries(dist).map(([k, v]) => `<span class="plan-badge">${k}: ${v}</span>`).join(' ');
+        document.getElementById('kpi-plan-dist').innerHTML = distBadges || 'None';
+      } catch (e) {
+        console.error("Failed to load stats", e);
+      }
+    }
+
+    // Fetch Licenses
+    async function loadLicenses() {
+      try {
+        const res = await fetch('/api/admin/licenses');
+        if (res.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        const data = await res.json();
+        ALL_LICENSES = data.licenses || [];
+        renderLicenses(ALL_LICENSES);
+        loadStats();
+      } catch (e) {
+        console.error("Failed to load licenses", e);
+      }
+    }
+
+    function renderLicenses(list) {
+      const tbody = document.getElementById('licenses-tbody');
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px; color: var(--text-muted);">No licenses found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map(lic => {
+        const devCount = lic.devices ? lic.devices.length : 0;
+        const devicesList = (lic.devices || []).map(d => `
+          <div class="device-pill" title="Last seen: ${d.last_seen || 'Never'}">
+            💻 ${d.pc_name || 'PC'} (${d.hwid.slice(0, 10)}...)
+          </div>
+        `).join('');
+
+        const statusClass = `status-${lic.status.toLowerCase()}`;
+        const isRevoked = lic.status === 'revoked';
+
+        return `
+          <tr>
+            <td>
+              <div class="key-badge">
+                <span>${lic.license_key}</span>
+                <span class="copy-btn" onclick="copyText('${lic.license_key}')" title="Copy Key">📋</span>
+              </div>
+              ${lic.notes ? `<div style="font-size:11px; color:var(--text-muted); margin-top:4px;">📝 ${lic.notes}</div>` : ''}
+            </td>
+            <td>
+              <div style="font-weight:600; color:#fff;">${lic.customer_name || 'Anonymous User'}</div>
+              <div style="font-size:11px; color:var(--text-muted);">${lic.customer_email || 'No email provided'}</div>
+            </td>
+            <td><span class="plan-badge">${lic.plan}</span></td>
+            <td>
+              <span style="font-weight:600; color:${devCount >= lic.max_devices ? 'var(--rose)' : 'var(--emerald)'}">
+                ${devCount} / ${lic.max_devices}
+              </span>
+              <div>${devicesList}</div>
+            </td>
+            <td>
+              <span style="font-size:12px;">${lic.expires_at ? new Date(lic.expires_at).toLocaleDateString() : 'Lifetime'}</span>
+            </td>
+            <td><span class="status-badge ${statusClass}">${lic.status}</span></td>
+            <td>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button class="btn btn-warning btn-sm" onclick="licenseAction(${lic.id}, 'reset_hwid')" title="Allow customer to bind to a new PC">
+                  🔄 Reset PC
+                </button>
+                <button class="btn ${isRevoked ? 'btn-primary' : 'btn-danger'} btn-sm" onclick="licenseAction(${lic.id}, '${isRevoked ? 'activate' : 'revoke'}')">
+                  ${isRevoked ? 'Activate' : 'Revoke'}
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="licenseAction(${lic.id}, 'delete')">
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterLicenses() {
+      const q = document.getElementById('license-search').value.toLowerCase();
+      const status = document.getElementById('license-filter-status').value;
+
+      const filtered = ALL_LICENSES.filter(lic => {
+        const matchesQuery = 
+          lic.license_key.toLowerCase().includes(q) ||
+          (lic.customer_name && lic.customer_name.toLowerCase().includes(q)) ||
+          (lic.customer_email && lic.customer_email.toLowerCase().includes(q));
+        const matchesStatus = (status === 'all' || lic.status === status);
+        return matchesQuery && matchesStatus;
+      });
+      renderLicenses(filtered);
+    }
+
+    async function licenseAction(id, action) {
+      if (action === 'delete' && !confirm('Are you sure you want to delete this license?')) return;
+      if (action === 'reset_hwid' && !confirm('Reset hardware locks for this customer?')) return;
+
+      try {
+        const res = await fetch(`/api/admin/licenses/${id}/action?action=${action}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`License action '${action}' completed.`);
+          loadLicenses();
+        } else {
+          showToast(data.detail || 'Action failed.');
+        }
+      } catch (e) {
+        showToast('Error performing license action');
+      }
+    }
+
+    // Handle Create License
+    async function handleCreateLicense(e) {
+      e.preventDefault();
+      const payload = {
+        count: parseInt(document.getElementById('gen-count').value),
+        plan: document.getElementById('gen-plan').value,
+        max_devices: parseInt(document.getElementById('gen-max-devices').value),
+        duration_days: document.getElementById('gen-duration').value ? parseInt(document.getElementById('gen-duration').value) : null,
+        customer_name: document.getElementById('gen-customer-name').value.trim(),
+        customer_email: document.getElementById('gen-customer-email').value.trim(),
+        notes: document.getElementById('gen-notes').value.trim()
+      };
+
+      try {
+        const res = await fetch('/api/admin/licenses/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('modal-keys-output').value = data.created_keys.join('\n');
+          document.getElementById('keys-modal').classList.add('active');
+          showToast(`Generated ${data.count} new license key(s)!`);
+        } else {
+          showToast(data.detail || 'Key creation failed.');
+        }
+      } catch (err) {
+        showToast('Failed to create licenses');
+      }
+    }
+
+    function handlePlanChange() {
+      const plan = document.getElementById('gen-plan').value;
+      const durationInput = document.getElementById('gen-duration');
+      if (plan === 'trial') durationInput.value = 7;
+      else if (plan === 'monthly') durationInput.value = 30;
+      else if (plan === 'annual') durationInput.value = 365;
+      else if (plan === 'lifetime') durationInput.value = '';
+    }
+
+    // Remote Fleet Config
+    async function loadFleetConfig() {
+      try {
+        const res = await fetch('/api/admin/config');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const cfg = await res.json();
+
+        document.getElementById('cfg-broadcast-active').checked = Boolean(cfg.broadcast_active);
+        document.getElementById('cfg-broadcast-msg').value = cfg.broadcast_message || '';
+        document.getElementById('cfg-broadcast-level').value = cfg.broadcast_level || 'info';
+
+        document.getElementById('cfg-feat-vision').checked = Boolean(cfg.feature_vision);
+        document.getElementById('cfg-feat-search').checked = Boolean(cfg.feature_web_search);
+        document.getElementById('cfg-feat-phone').checked = Boolean(cfg.feature_phone_dashboard);
+        document.getElementById('cfg-feat-wake').checked = Boolean(cfg.feature_wake_word);
+        document.getElementById('cfg-feat-plugins').checked = Boolean(cfg.feature_plugins);
+
+        document.getElementById('cfg-system-prompt').value = cfg.system_prompt_override || '';
+        document.getElementById('cfg-latest-ver').value = cfg.latest_app_version || '1.0.0';
+        document.getElementById('cfg-min-ver').value = cfg.min_app_version || '1.0.0';
+        document.getElementById('cfg-download-url').value = cfg.download_url || '';
+        document.getElementById('cfg-release-notes').value = cfg.release_notes || '';
+      } catch (e) {
+        console.error('Failed to load fleet config', e);
+      }
+    }
+
+    async function saveFleetConfig() {
+      const payload = {
+        broadcast_active: document.getElementById('cfg-broadcast-active').checked,
+        broadcast_message: document.getElementById('cfg-broadcast-msg').value.trim(),
+        broadcast_level: document.getElementById('cfg-broadcast-level').value,
+        feature_vision: document.getElementById('cfg-feat-vision').checked,
+        feature_web_search: document.getElementById('cfg-feat-search').checked,
+        feature_phone_dashboard: document.getElementById('cfg-feat-phone').checked,
+        feature_wake_word: document.getElementById('cfg-feat-wake').checked,
+        feature_plugins: document.getElementById('cfg-feat-plugins').checked,
+        system_prompt_override: document.getElementById('cfg-system-prompt').value.trim(),
+        latest_app_version: document.getElementById('cfg-latest-ver').value.trim(),
+        min_app_version: document.getElementById('cfg-min-ver').value.trim(),
+        download_url: document.getElementById('cfg-download-url').value.trim(),
+        release_notes: document.getElementById('cfg-release-notes').value.trim(),
+      };
+
+      try {
+        const res = await fetch('/api/admin/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Fleet settings deployed to all clients!');
+        } else {
+          showToast(data.detail || 'Failed to update fleet config.');
+        }
+      } catch (e) {
+        showToast('Error deploying fleet configuration');
+      }
+    }
+
+    // Telemetry
+    async function loadTelemetry() {
+      try {
+        const res = await fetch('/api/admin/crashes');
+        const data = await res.json();
+        const tbody = document.getElementById('telemetry-tbody');
+        const crashes = data.crashes || [];
+        if (!crashes.length) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color: var(--text-muted);">No crash incidents reported.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = crashes.map(c => `
+          <tr>
+            <td style="font-size:12px; color:var(--text-muted);">${new Date(c.created_at).toLocaleString()}</td>
+            <td><span class="key-badge">${c.license_key || 'UNKNOWN'}</span></td>
+            <td><span style="font-family:var(--font-mono); font-size:11px;">${(c.hwid || '').slice(0, 16)}...</span></td>
+            <td>${c.app_version || '1.0.0'}</td>
+            <td style="color:var(--rose); font-family:var(--font-mono); font-size:12px;">${c.error_message || 'Error'}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick="alert(\`${(c.traceback || '').replace(/`/g, '\\\`')}\`)">View Traceback</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error('Failed to load telemetry', e);
+      }
+    }
+
+    // Logout
+    async function logout() {
+      await fetch('/api/admin/logout', { method: 'POST' });
+      window.location.href = '/login';
+    }
+
+    // Auto-init
+    loadStats();
+    loadLicenses();
+  </script>
+</body>
+</html>

@@ -130,7 +130,7 @@ def _load_system_prompt() -> str:
         return PROMPT_PATH.read_text(encoding="utf-8")
     except Exception:
         return (
-            "You are JARVIS, Tony Stark's AI assistant. "
+            "You are BRONO (বর্ণ), an intelligent personal AI assistant. "
             "Be concise, direct, and always use the provided tools to complete tasks. "
             "Never simulate or guess results — always call the appropriate tool."
         )
@@ -193,7 +193,7 @@ TOOL_DECLARATIONS = [
         "name": "manage_monitor",
         "description": (
             "Add, remove, or list background monitoring topics. "
-            "JARVIS checks these topics once a day and alerts the user when there is a new development. "
+            "BRONO checks these topics once a day and alerts the user when there is a new development. "
             "Use 'add' when the user says 'monitor X', 'track X', 'follow X'. "
             "Use 'remove' when the user says 'stop monitoring X'. "
             "Use 'list' when the user asks what is being monitored. "
@@ -219,7 +219,7 @@ TOOL_DECLARATIONS = [
         "description": (
             "Shuts down the assistant completely. "
             "Call this when the user expresses intent to end the conversation, "
-            "close the assistant, say goodbye, or stop Jarvis. "
+            "close the assistant, say goodbye, or stop BRONO. "
             "The user can say this in ANY language."
         ),
         "parameters": {
@@ -674,10 +674,10 @@ class JarvisLive:
         # Load customization from config
         try:
             _cfg = json.loads(open(API_CONFIG_PATH, encoding="utf-8").read())
-            self._asst_name = (_cfg.get("assistant_name") or "JARVIS").strip()
+            self._asst_name = (_cfg.get("assistant_name") or "BRONO").strip()
             _user_name = (_cfg.get("user_name") or "").strip()
         except Exception:
-            self._asst_name = "JARVIS"
+            self._asst_name = "BRONO"
             _user_name = ""
 
         memory     = load_memory()
@@ -712,6 +712,10 @@ class JarvisLive:
         if mem_str:
             parts.append(mem_str)
         parts.append(sys_prompt)
+
+        from core.licensing import _REMOTE_CONFIG
+        if _REMOTE_CONFIG.get("system_prompt_override"):
+            parts.append(f"\n[FLEET REMOTE OVERRIDE]\n{_REMOTE_CONFIG['system_prompt_override']}\n")
 
         cfg = dict(
             response_modalities=["AUDIO"],
@@ -1219,13 +1223,13 @@ class JarvisLive:
             e = identity.get(k, {})
             return (e.get("value", "") if isinstance(e, dict) else str(e)).strip()
 
-        lang = _val("language")
+        lang = _val("language") or "Bengali"
         name = _val("name")
         time_str = datetime.now().strftime("%H:%M")
 
         # Start fetching news immediately — runs in parallel while phase 1 plays
         loop = asyncio.get_event_loop()
-        news_future = loop.run_in_executor(None, _fetch_news_sync, "top world news today")
+        news_future = loop.run_in_executor(None, _fetch_news_sync, "Bangladesh news today")
 
         await asyncio.sleep(0.3)
         if not self.session:
@@ -1254,7 +1258,7 @@ class JarvisLive:
             )
 
         p1 = (
-            f"Greet the user warmly, mention it is {time_str}, and say you are fetching today's news now.{session_clause} "
+            f"Greet the user warmly, mention it is {time_str}, and say you are fetching today's Bangladesh news now.{session_clause} "
             f"Keep it to 2 short sentences max. Do not call any tools.{lang_clause}{name_clause}"
         )
 
@@ -1305,17 +1309,17 @@ class JarvisLive:
 
                 if news_text and len(news_text) > 60:
                     # Show on UI content panel immediately
-                    self.ui.show_content("NEWS — top world news today", news_text)
+                    self.ui.show_content("NEWS — BANGLADESH", news_text)
 
                     p2 = (
-                        f"[BRIEFING] Here are today's top news headlines:\n{news_text}\n\n"
-                        "Pick ONE headline, summarise it in one sentence, then say the full list "
-                        f"is displayed on screen. Do not call any tools.{lang_str}"
+                        f"[BRIEFING] Here are today's top Bangladesh news headlines:\n{news_text}\n\n"
+                        "Pick ONE headline, summarise it in Bengali in one sentence, then say the full list "
+                        f"is displayed on screen in the content panel. Do not call any tools.{lang_str}"
                     )
                 else:
                     p2 = (
-                        "News headlines could not be fetched right now. "
-                        f"Let the user know briefly.{lang_str}"
+                        "Bangladesh news headlines could not be fetched right now. "
+                        f"Let the user know briefly in Bengali.{lang_str}"
                     )
 
                 await self.session.send_client_content(
@@ -1341,7 +1345,7 @@ class JarvisLive:
         memory = load_memory()
         lang_entry = memory.get("identity", {}).get("language", {})
         lang = (lang_entry.get("value", "") if isinstance(lang_entry, dict) else str(lang_entry)).strip()
-        lang = lang or "English"
+        lang = lang or "Bengali"
 
         convo = "\n".join(log[-40:])   # cap at last 40 turns to stay within token budget
         prompt = (
@@ -1401,7 +1405,7 @@ class JarvisLive:
                         alerts = await asyncio.to_thread(monitor_check_all)
                         memory = load_memory()
                         lang_e = memory.get("identity", {}).get("language", {})
-                        lang   = (lang_e.get("value", "") if isinstance(lang_e, dict) else str(lang_e)).strip() or "English"
+                        lang   = (lang_e.get("value", "") if isinstance(lang_e, dict) else str(lang_e)).strip() or "Bengali"
                         for alert in alerts:
                             msg = (
                                 f"{alert}\n\n"
@@ -1517,6 +1521,43 @@ class JarvisLive:
                 print(f"[Dashboard] Command error: {e}")
                 await asyncio.sleep(0.5)
 
+    async def _licensing_heartbeat_loop(self):
+        """Periodic fleet heartbeat to sync with admin server and check remote flags."""
+        from core.licensing import heartbeat, get_remote_broadcast
+        # Initial heartbeat immediately on startup
+        try:
+            res = await asyncio.to_thread(heartbeat)
+            if res.get("revoked"):
+                self.ui.write_log("ERR: License suspended or revoked by administrator.")
+                self.ui.trigger_license_gate("REVOKED")
+            else:
+                bc = get_remote_broadcast()
+                if bc and bc.get("message"):
+                    self.ui.update_broadcast(bc["message"], bc.get("level", "info"))
+        except Exception:
+            pass
+
+        while True:
+            try:
+                await asyncio.sleep(60)
+                res = await asyncio.to_thread(heartbeat)
+                if res.get("revoked"):
+                    self.ui.write_log("ERR: License suspended or revoked by administrator.")
+                    self.ui.trigger_license_gate("REVOKED")
+                    if self.session:
+                        self._reconnect_keep = False
+                        if self._reconnect_event:
+                            self._reconnect_event.set()
+                    break
+
+                bc = get_remote_broadcast()
+                if bc and bc.get("message"):
+                    self.ui.update_broadcast(bc["message"], bc.get("level", "info"))
+                else:
+                    self.ui.update_broadcast("")
+            except Exception:
+                pass
+
     # ── main loop ───────────────────────────────────────────────────────────
 
     async def run(self):
@@ -1553,7 +1594,8 @@ class JarvisLive:
             asyncio.create_task(self._process_dashboard_commands())
         except Exception as e:
             print(f"[Dashboard] Disabled: {e}")
-            self._dashboard = None
+        # Start fleet licensing heartbeat & remote telemetry
+        asyncio.create_task(self._licensing_heartbeat_loop())
 
         while True:
             try:
@@ -1600,11 +1642,11 @@ class JarvisLive:
                         self._ensure_wake_detector()
                         self._awake = False
                         self.ui.set_state("SLEEPING")
-                        self.ui.write_log("SYS: JARVIS online — sleeping. Say 'Hey Jarvis' to wake me.")
+                        self.ui.write_log("SYS: BRONO online — sleeping. Say 'Hey Jarvis' to wake me.")
                     else:
                         self._awake = True
                         self.ui.set_state("LISTENING")
-                        self.ui.write_log("SYS: JARVIS online.")
+                        self.ui.write_log("SYS: BRONO online.")
 
                     if self._dashboard:
                         await self._dashboard.broadcast({"type": "status", "state": "active"})
@@ -1728,6 +1770,16 @@ class JarvisLive:
             await asyncio.sleep(delay)
 
 def main():
+    from core.licensing import report_crash
+
+    def _crash_telemetry(exctype, value, tb):
+        err_msg = f"{exctype.__name__}: {value}"
+        tb_str = "".join(traceback.format_exception(exctype, value, tb))
+        report_crash(err_msg, tb_str)
+        sys.__excepthook__(exctype, value, tb)
+
+    sys.excepthook = _crash_telemetry
+
     ui = JarvisUI("face.png")
 
     def runner():
@@ -1737,6 +1789,9 @@ def main():
             asyncio.run(jarvis.run())
         except KeyboardInterrupt:
             print("\n🔴 Shutting down...")
+        except Exception as e:
+            report_crash(str(e), traceback.format_exc())
+            raise e
 
     threading.Thread(target=runner, daemon=True).start()
     ui.root.mainloop()

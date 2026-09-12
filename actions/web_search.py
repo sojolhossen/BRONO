@@ -1,7 +1,16 @@
 #web_search.py
 import json
 import sys
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", message=".*renamed to.*ddgs.*")
+
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 def _get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
@@ -43,16 +52,26 @@ def _ddg_search(query: str, max_results: int = 6) -> list[dict]:
     try:
         from ddgs import DDGS
     except ImportError:
-        from duckduckgo_search import DDGS
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                from duckduckgo_search import DDGS
+        except ImportError:
+            return []
 
     results = []
-    with DDGS() as ddgs:
-        for r in ddgs.text(query, max_results=max_results):
-            results.append({
-                "title":   r.get("title",  ""),
-                "snippet": r.get("body",   ""),
-                "url":     r.get("href",   ""),
-            })
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with DDGS() as ddgs:
+                for r in ddgs.text(query, max_results=max_results):
+                    results.append({
+                        "title":   r.get("title",  ""),
+                        "snippet": r.get("body",   ""),
+                        "url":     r.get("href",   ""),
+                    })
+    except Exception as e:
+        print(f"[WebSearch] [WARN] DDG text search failed ({e})")
     return results
 
 
@@ -61,22 +80,88 @@ def _ddg_news(query: str, max_results: int = 8) -> list[dict]:
     try:
         from ddgs import DDGS
     except ImportError:
-        from duckduckgo_search import DDGS
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                from duckduckgo_search import DDGS
+        except ImportError:
+            return []
 
     results = []
     try:
-        with DDGS() as ddgs:
-            for r in ddgs.news(query, max_results=max_results):
-                results.append({
-                    "title":   r.get("title",  ""),
-                    "snippet": r.get("body",   ""),
-                    "url":     r.get("url",    ""),
-                    "source":  r.get("source", ""),
-                })
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with DDGS() as ddgs:
+                for r in ddgs.news(query, max_results=max_results):
+                    results.append({
+                        "title":   r.get("title",  ""),
+                        "snippet": r.get("body",   ""),
+                        "url":     r.get("url",    ""),
+                        "source":  r.get("source", ""),
+                    })
     except Exception as e:
-        print(f"[WebSearch] ⚠️ DDG news() failed ({e}) — falling back to text search")
+        print(f"[WebSearch] [WARN] DDG news() failed ({e}) - falling back to text search")
         results = _ddg_search(query, max_results=max_results)
     return results
+
+
+def _fetch_rss_headlines(query: str = "", max_results: int = 8) -> list[dict]:
+    """Fetch live news headlines from Google News RSS. Zero API keys, ultra fast."""
+    import urllib.request
+    import urllib.parse
+    import xml.etree.ElementTree as ET
+
+    q_lower = (query or "").lower().strip()
+    is_bd = not q_lower or "bangladesh" in q_lower or "bd" in q_lower.split() or "বাংলাদেশ" in (query or "")
+
+    if is_bd:
+        urls = [
+            "https://news.google.com/rss/headlines/section/topic/NATION?hl=bn&gl=BD&ceid=BD:bn",
+            "https://news.google.com/rss?hl=bn&gl=BD&ceid=BD:bn",
+            "https://news.google.com/rss/search?q=Bangladesh&hl=en-US&gl=BD&ceid=BD:en",
+        ]
+    else:
+        encoded = urllib.parse.quote(query)
+        urls = [
+            f"https://news.google.com/rss/search?q={encoded}&hl=en-US&gl=US&ceid=US:en",
+        ]
+
+    for url in urls:
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            )
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                xml_data = resp.read()
+            root = ET.fromstring(xml_data)
+            items = root.findall(".//item")
+            if not items:
+                continue
+
+            results = []
+            for it in items[:max_results]:
+                title = it.find("title")
+                title_text = title.text.strip() if (title is not None and title.text) else ""
+                source = it.find("source")
+                source_text = source.text.strip() if (source is not None and source.text) else ""
+                link = it.find("link")
+                link_text = link.text.strip() if (link is not None and link.text) else ""
+
+                if title_text:
+                    results.append({
+                        "title": title_text,
+                        "source": source_text,
+                        "url": link_text,
+                        "snippet": "",
+                    })
+
+            if results:
+                return results
+        except Exception as e:
+            continue
+
+    return []
 
 
 def _format_ddg(query: str, results: list[dict]) -> str:
@@ -96,12 +181,15 @@ def _format_news(query: str, results: list[dict]) -> str:
     if not results:
         return f"No news found for: {query}"
 
-    lines = [f"Latest news: {query}\n"]
+    q_lower = (query or "").lower()
+    is_bd = not q_lower or "bangladesh" in q_lower or "bd" in q_lower.split() or "বাংলাদেশ" in (query or "")
+    title_label = "Latest Bangladesh News Headlines" if is_bd else f"Latest news: {query}"
+    lines = [f"{title_label}:\n"]
     for i, r in enumerate(results, 1):
         title = r.get("title", "")
         if not title:
             continue
-        src = f"  [{r['source']}]" if r.get("source") else ""
+        src = f"  [{r['source']}]" if r.get("source") and r['source'] not in title else ""
         lines.append(f"{i}. {title}{src}")
         if r.get("snippet"):
             lines.append(f"   {r['snippet'][:140]}")
@@ -157,25 +245,36 @@ def _search(query: str) -> str:
     try:
         return _gemini_search(query)
     except Exception as e:
-        print(f"[WebSearch] ⚠️ Gemini failed ({e}) — trying DDG...")
+        print(f"[WebSearch] [WARN] Gemini failed ({e}) - trying DDG...")
         results = _ddg_search(query)
         return _format_ddg(query, results)
 
 
 def _news(query: str) -> str:
     """
-    Runs Gemini grounded search AND DDG news in parallel.
+    Runs RSS news, Gemini grounded search, and DDG news in parallel.
     Returns whichever delivers a valid result first; cancels the other.
+    Defaults to Bangladesh news when query is empty or unspecified.
     """
     import threading
 
-    gemini_query = f"latest news today: {query}" if query else "top world news today"
-    ddg_query    = query if query else "world news today"
+    q_lower = (query or "").lower().strip()
+    is_bd = not q_lower or "bangladesh" in q_lower or "bd" in q_lower.split() or "বাংলাদেশ" in (query or "")
+
+    if is_bd:
+        topic_label  = "Bangladesh"
+        gemini_query = "latest Bangladesh news today headlines"
+        ddg_query    = "Bangladesh news today"
+    else:
+        topic_label  = query
+        gemini_query = f"latest news today: {query}"
+        ddg_query    = query
 
     result_box  = [None]   # first valid result lands here
     lock        = threading.Lock()
     done_evt    = threading.Event()
     failures    = [0]
+    total_backends = 3
 
     def _store(r: str) -> None:
         if r and len(r) > 60:
@@ -186,29 +285,43 @@ def _news(query: str) -> str:
         else:
             with lock:
                 failures[0] += 1
-                if failures[0] >= 2:   # both failed — unblock caller
+                if failures[0] >= total_backends:   # all failed — unblock caller
                     done_evt.set()
+
+    def _try_rss():
+        try:
+            items = _fetch_rss_headlines(query=topic_label, max_results=8)
+            if items:
+                _store(_format_news(topic_label, items))
+            else:
+                _store("")
+        except Exception as e:
+            print(f"[WebSearch] [WARN] RSS news failed ({e})")
+            _store("")
 
     def _try_gemini():
         try:
             _store(_gemini_search(gemini_query))
         except Exception as e:
-            print(f"[WebSearch] ⚠️ Gemini news failed ({e})")
+            print(f"[WebSearch] [WARN] Gemini news failed ({e})")
             _store("")
 
     def _try_ddg():
         try:
             results = _ddg_news(ddg_query, max_results=8)
+            if not results:
+                results = _ddg_search(ddg_query, max_results=6)
             _store(_format_news(ddg_query, results))
         except Exception as e:
-            print(f"[WebSearch] ⚠️ DDG news failed ({e})")
+            print(f"[WebSearch] [WARN] DDG news failed ({e})")
             _store("")
 
+    threading.Thread(target=_try_rss,    daemon=True).start()
     threading.Thread(target=_try_gemini, daemon=True).start()
     threading.Thread(target=_try_ddg,    daemon=True).start()
 
-    done_evt.wait(timeout=10.0)
-    return result_box[0] or f"No news found for: {query}"
+    done_evt.wait(timeout=8.0)
+    return result_box[0] or f"No news found for: {query or 'Bangladesh'}"
 
 
 def _research(query: str) -> str:
@@ -223,7 +336,7 @@ def _research(query: str) -> str:
     try:
         return _gemini_search(research_query)
     except Exception as e:
-        print(f"[WebSearch] ⚠️ Research Gemini failed ({e}) — DDG fallback...")
+        print(f"[WebSearch] [WARN] Research Gemini failed ({e}) - DDG fallback...")
         results = _ddg_search(query, max_results=10)
         return _format_ddg(query, results)
 
@@ -234,7 +347,7 @@ def _price(query: str) -> str:
     try:
         return _gemini_search(price_query)
     except Exception as e:
-        print(f"[WebSearch] ⚠️ Price Gemini failed ({e}) — DDG fallback...")
+        print(f"[WebSearch] [WARN] Price Gemini failed ({e}) - DDG fallback...")
         results = _ddg_search(f"{query} price buy", max_results=6)
         return _format_ddg(query, results)
 
@@ -247,7 +360,7 @@ def _compare(items: list[str], aspect: str) -> str:
     try:
         return _gemini_search(query)
     except Exception as e:
-        print(f"[WebSearch] ⚠️ Gemini compare failed: {e} — falling back to DDG")
+        print(f"[WebSearch] [WARN] Gemini compare failed: {e} - falling back to DDG")
 
     all_results: dict[str, list] = {}
     for item in items:
@@ -290,7 +403,7 @@ def web_search(
     if player:
         player.write_log(f"[Search:{mode}] {query or ', '.join(items)}")
 
-    print(f"[WebSearch] 🔍 mode={mode!r}  query={query!r}")
+    print(f"[WebSearch] [INFO] mode={mode!r}  query={query!r}")
 
     try:
         if mode == "compare" and items:
@@ -304,7 +417,7 @@ def web_search(
         return _search(query)
 
     except Exception as e:
-        print(f"[WebSearch] ❌ All backends failed: {e}")
+        print(f"[WebSearch] [ERROR] All backends failed: {e}")
         return f"Search failed: {e}"
 
 
