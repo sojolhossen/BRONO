@@ -410,6 +410,8 @@ def check_for_updates(current_version: str = CURRENT_APP_VERSION) -> dict | None
 
     # ── Source 1: GitHub Raw version.json & jsDelivr CDN (Instant, 0 rate-limits) ──
     raw_urls = [
+        "https://raw.githubusercontent.com/sojolhossen/BRONO-Releases/main/version.json",
+        "https://cdn.jsdelivr.net/gh/sojolhossen/BRONO-Releases@main/version.json",
         "https://raw.githubusercontent.com/sojolhossen/BRONO/main/version.json",
         "https://cdn.jsdelivr.net/gh/sojolhossen/BRONO@main/version.json",
     ]
@@ -427,7 +429,7 @@ def check_for_updates(current_version: str = CURRENT_APP_VERSION) -> dict | None
                         return {
                             "has_update": True,
                             "latest_version": v,
-                            "download_url": data.get("download_url") or "https://github.com/sojolhossen/BRONO/releases/latest",
+                            "download_url": data.get("download_url") or "https://github.com/sojolhossen/BRONO-Releases/releases/latest",
                             "release_notes": data.get("release_notes", ""),
                             "source": "github_raw",
                         }
@@ -435,47 +437,54 @@ def check_for_updates(current_version: str = CURRENT_APP_VERSION) -> dict | None
             continue
 
     # ── Source 2: GitHub Releases Web Redirect (0 rate-limits, checks published release tag) ──
-    try:
-        req = urllib.request.Request(
-            "https://github.com/sojolhossen/BRONO/releases/latest",
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        )
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            final_url = resp.geturl()
-            if "/releases/tag/" in final_url:
-                tag = final_url.split("/releases/tag/")[-1].strip().lstrip("v")
+    web_urls = [
+        "https://github.com/sojolhossen/BRONO-Releases/releases/latest",
+        "https://github.com/sojolhossen/BRONO/releases/latest",
+    ]
+    for w_url in web_urls:
+        try:
+            req = urllib.request.Request(
+                w_url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                final_url = resp.geturl()
+                if "/releases/tag/" in final_url:
+                    tag = final_url.split("/releases/tag/")[-1].strip().lstrip("v")
+                    if tag and _is_newer(tag, current_version):
+                        return {
+                            "has_update": True,
+                            "latest_version": tag,
+                            "download_url": final_url,
+                            "release_notes": f"New release {tag} available on GitHub.",
+                            "source": "github_web",
+                        }
+        except Exception:
+            pass
+
+    # ── Source 3: GitHub REST API (Standard releases endpoint) ──
+    api_repos = ["sojolhossen/BRONO-Releases", "sojolhossen/BRONO"]
+    for repo_name in api_repos:
+        try:
+            gh_req = urllib.request.Request(
+                f"https://api.github.com/repos/{repo_name}/releases/latest",
+                headers={"User-Agent": "BRONO-Client/1.0", "Accept": "application/vnd.github.v3+json"}
+            )
+            with urllib.request.urlopen(gh_req, timeout=4) as resp:
+                gh_data = json.loads(resp.read().decode("utf-8"))
+                tag = gh_data.get("tag_name", "").lstrip("v").strip()
                 if tag and _is_newer(tag, current_version):
+                    assets = gh_data.get("assets", [])
+                    d_url = assets[0]["browser_download_url"] if assets else gh_data.get("html_url", "")
                     return {
                         "has_update": True,
                         "latest_version": tag,
-                        "download_url": final_url,
-                        "release_notes": f"New release {tag} available on GitHub.",
-                        "source": "github_web",
+                        "download_url": d_url,
+                        "release_notes": gh_data.get("body", ""),
+                        "source": "github_api",
                     }
-    except Exception:
-        pass
-
-    # ── Source 3: GitHub REST API (Standard releases endpoint) ──
-    try:
-        gh_req = urllib.request.Request(
-            "https://api.github.com/repos/sojolhossen/BRONO/releases/latest",
-            headers={"User-Agent": "BRONO-Client/1.0", "Accept": "application/vnd.github.v3+json"}
-        )
-        with urllib.request.urlopen(gh_req, timeout=5) as resp:
-            gh_data = json.loads(resp.read().decode("utf-8"))
-            tag = gh_data.get("tag_name", "").lstrip("v").strip()
-            if tag and _is_newer(tag, current_version):
-                assets = gh_data.get("assets", [])
-                d_url = assets[0]["browser_download_url"] if assets else gh_data.get("html_url", "")
-                return {
-                    "has_update": True,
-                    "latest_version": tag,
-                    "download_url": d_url,
-                    "release_notes": gh_data.get("body", ""),
-                    "source": "github_api",
-                }
-    except Exception:
-        pass
+        except Exception:
+            pass
 
     # ── Source 4: Fleet Server remote_config (Admin dashboard fallback) ──
     latest_ver = _REMOTE_CONFIG.get("latest_app_version", "").strip()

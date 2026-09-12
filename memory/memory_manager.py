@@ -12,8 +12,16 @@ def get_base_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-BASE_DIR         = get_base_dir()
-MEMORY_PATH      = BASE_DIR / "memory" / "long_term.json"
+BASE_DIR = get_base_dir()
+
+def _get_active_memory_path() -> Path:
+    try:
+        from core.paths import get_memory_path
+        return get_memory_path()
+    except Exception:
+        return BASE_DIR / "memory" / "long_term.json"
+
+MEMORY_PATH      = _get_active_memory_path()
 _lock            = Lock()
 MAX_VALUE_LENGTH = 380
 
@@ -55,11 +63,12 @@ def _empty_memory() -> dict:
     }
 
 def load_memory() -> dict:
-    if not MEMORY_PATH.exists():
+    p = _get_active_memory_path()
+    if not p.exists():
         return _empty_memory()
     with _lock:
         try:
-            data = json.loads(MEMORY_PATH.read_text(encoding="utf-8"))
+            data = json.loads(p.read_text(encoding="utf-8"))
             if isinstance(data, dict):
                 base = _empty_memory()
                 for key in base:
@@ -119,12 +128,17 @@ def save_memory(memory: dict) -> None:
     if not isinstance(memory, dict):
         return
     memory = _trim_to_limit(memory)
-    MEMORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    p = _get_active_memory_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(memory, indent=2, ensure_ascii=False)
     with _lock:
-        MEMORY_PATH.write_text(
-            json.dumps(memory, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        p.write_text(payload, encoding="utf-8")
+        try:
+            local_p = BASE_DIR / "memory" / "long_term.json"
+            if local_p.parent.exists() and local_p.resolve() != p.resolve():
+                local_p.write_text(payload, encoding="utf-8")
+        except Exception:
+            pass
 
 
 def _truncate_value(val: str) -> str:
@@ -445,12 +459,7 @@ def save_session_summary(summary: str, language: str = "") -> None:
         entry["language"] = language
     sessions.append(entry)
     memory["sessions"] = sessions[-_SESSION_MAX:]
-    with _lock:
-        MEMORY_PATH.parent.mkdir(parents=True, exist_ok=True)
-        MEMORY_PATH.write_text(
-            json.dumps(memory, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+    save_memory(memory)
     print(f"[Memory] 📝 Session saved ({entry['date']}): {summary[:60]}…")
 
 
@@ -459,21 +468,11 @@ def pop_last_session() -> dict | None:
     Return AND remove the most recent session entry.
     Calling this consumes the entry so it is never repeated in future briefings.
     """
-    with _lock:
-        if not MEMORY_PATH.exists():
-            return None
-        try:
-            memory   = json.loads(MEMORY_PATH.read_text(encoding="utf-8"))
-            sessions = memory.get("sessions", [])
-            if not isinstance(sessions, list) or not sessions:
-                return None
-            entry = sessions.pop()          # remove the last entry
-            memory["sessions"] = sessions
-            MEMORY_PATH.write_text(
-                json.dumps(memory, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-            return entry
-        except Exception as e:
-            print(f"[Memory] ⚠️ pop_last_session error: {e}")
-            return None
+    memory = load_memory()
+    sessions = memory.get("sessions", [])
+    if not isinstance(sessions, list) or not sessions:
+        return None
+    entry = sessions.pop()          # remove the last entry
+    memory["sessions"] = sessions
+    save_memory(memory)
+    return entry

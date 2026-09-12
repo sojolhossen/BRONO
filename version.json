@@ -2,7 +2,7 @@
   "app_name": "BRONO",
   "version": "1.0.0",
   "release_date": "2026-09-12",
-  "download_url": "https://github.com/sojolhossen/BRONO/releases/latest",
-  "release_notes": "BRONO Enterprise initial release with AI capabilities and lifetime licensing.",
+  "download_url": "https://github.com/sojolhossen/BRONO-Releases/releases/latest",
+  "release_notes": "BRONO Enterprise initial release with persistent memory and lifetime licensing.",
   "mandatory": false
 }

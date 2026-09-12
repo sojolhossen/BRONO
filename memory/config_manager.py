@@ -8,37 +8,50 @@ def get_base_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 BASE_DIR    = get_base_dir()
-CONFIG_DIR  = BASE_DIR / "config"
-CONFIG_FILE = CONFIG_DIR / "api_keys.json"
+
+def _get_active_config_path() -> Path:
+    try:
+        from core.paths import get_config_path
+        return get_config_path()
+    except Exception:
+        return BASE_DIR / "config" / "api_keys.json"
+
+CONFIG_FILE = _get_active_config_path()
+CONFIG_DIR  = CONFIG_FILE.parent
 
 def ensure_config_dir() -> None:
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    p = _get_active_config_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
 
 def config_exists() -> bool:
-    return CONFIG_FILE.exists()
+    return _get_active_config_path().exists()
 
 def save_api_keys(gemini_api_key: str) -> None:
-    ensure_config_dir()
-
+    p = _get_active_config_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
     data: dict = {}
-    if CONFIG_FILE.exists():
+    if p.exists():
         try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+            data = json.loads(p.read_text(encoding="utf-8"))
         except Exception:
             data = {}
 
     data["gemini_api_key"] = gemini_api_key.strip()
-
-    CONFIG_FILE.write_text(
-        json.dumps(data, indent=2),
-        encoding="utf-8"
-    )
+    payload = json.dumps(data, indent=2)
+    p.write_text(payload, encoding="utf-8")
+    try:
+        local_f = BASE_DIR / "config" / "api_keys.json"
+        if local_f.parent.exists() and local_f.resolve() != p.resolve():
+            local_f.write_text(payload, encoding="utf-8")
+    except Exception:
+        pass
 
 def load_api_keys() -> dict:
-    if not CONFIG_FILE.exists():
+    p = _get_active_config_path()
+    if not p.exists():
         return {}
     try:
-        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        return json.loads(p.read_text(encoding="utf-8"))
     except Exception as e:
         print(f"❌ Failed to load api_keys.json: {e}")
         return {}
@@ -126,15 +139,7 @@ def get_brief_enabled() -> bool:
 
 
 def save_brief_enabled(enabled: bool) -> None:
-    ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
-    data["morning_brief_enabled"] = enabled
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _patch_config(morning_brief_enabled=enabled)
 
 
 # ── Audio devices ────────────────────────────────────────────────────────────
@@ -145,20 +150,24 @@ def save_brief_enabled(enabled: bool) -> None:
 # so unplugging a headset degrades to the built-in speakers instead of crashing.
 
 def _patch_config(**fields) -> None:
-    """Read-modify-write one or more keys in api_keys.json.
-
-    Every setter in this file open-coded this. Collapsing it here means a new
-    setting is one line, and there is one place where a corrupt config file is
-    handled instead of nine."""
-    ensure_config_dir()
+    """Read-modify-write one or more keys in api_keys.json."""
+    p = _get_active_config_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
     data: dict = {}
-    if CONFIG_FILE.exists():
+    if p.exists():
         try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+            data = json.loads(p.read_text(encoding="utf-8"))
         except Exception:
             data = {}
     data.update(fields)
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    payload = json.dumps(data, indent=4)
+    p.write_text(payload, encoding="utf-8")
+    try:
+        local_f = BASE_DIR / "config" / "api_keys.json"
+        if local_f.parent.exists() and local_f.resolve() != p.resolve():
+            local_f.write_text(payload, encoding="utf-8")
+    except Exception:
+        pass
 
 
 def get_input_device() -> str:

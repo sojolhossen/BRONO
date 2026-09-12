@@ -121,7 +121,12 @@ def _pcm_level(samples) -> float:
 
 
 def _get_api_key() -> str:
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
+    try:
+        from core.paths import get_config_path
+        cfg_p = get_config_path()
+    except Exception:
+        cfg_p = API_CONFIG_PATH
+    with open(cfg_p, "r", encoding="utf-8") as f:
         return json.load(f)["gemini_api_key"]
 
 

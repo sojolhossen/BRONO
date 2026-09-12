@@ -48,15 +48,23 @@ def _base_dir() -> Path:
         return Path(sys.executable).parent
     return Path(__file__).resolve().parent
 
-BASE_DIR   = _base_dir()
-CONFIG_DIR = BASE_DIR / "config"
-API_FILE   = CONFIG_DIR / "api_keys.json"
+BASE_DIR = _base_dir()
+
+def _get_active_config_path() -> Path:
+    try:
+        from core.paths import get_config_path
+        return get_config_path()
+    except Exception:
+        return BASE_DIR / "config" / "api_keys.json"
+
+API_FILE   = _get_active_config_path()
+CONFIG_DIR = API_FILE.parent
 
 
 def _read_full_config() -> dict:
     """Read api_keys.json config dict. Returns {} on any error."""
     try:
-        return json.loads(API_FILE.read_text(encoding="utf-8"))
+        return json.loads(_get_active_config_path().read_text(encoding="utf-8"))
     except Exception:
         return {}
 
@@ -4930,13 +4938,18 @@ class MainWindow(QMainWindow):
         self._overlay = ov
 
     def _on_setup_done(self, key: str, os_name: str):
-        os.makedirs(CONFIG_DIR, exist_ok=True)
+        p = _get_active_config_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
         cfg = _read_full_config()
         cfg.update({"gemini_api_key": key, "os_system": os_name})
-        API_FILE.write_text(
-            json.dumps(cfg, indent=4),
-            encoding="utf-8",
-        )
+        payload = json.dumps(cfg, indent=4)
+        p.write_text(payload, encoding="utf-8")
+        try:
+            local_f = BASE_DIR / "config" / "api_keys.json"
+            if local_f.parent.exists() and local_f.resolve() != p.resolve():
+                local_f.write_text(payload, encoding="utf-8")
+        except Exception:
+            pass
         self._ready = True
         if self._overlay:
             self._overlay.hide()
