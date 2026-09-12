@@ -1478,9 +1478,11 @@ class SetupOverlay(QWidget):
 
 class LicenseActivationOverlay(QWidget):
     activated = pyqtSignal(dict)
+    _verify_done = pyqtSignal(bool, str, dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._verify_done.connect(self._on_verify_result)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"""
             LicenseActivationOverlay {{
@@ -1592,16 +1594,19 @@ class LicenseActivationOverlay(QWidget):
             self._status_lbl.setText("Please enter your license key.")
             return
 
+        name = self._name_input.text().strip()
         self._btn_activate.setEnabled(False)
         self._status_lbl.setStyleSheet(f"color: {C.PRI}; background: transparent;")
         self._status_lbl.setText("Verifying hardware signature with fleet server...")
         QApplication.processEvents()
 
         def _bg_verify():
-            from core.licensing import activate_license
-            name = self._name_input.text().strip()
-            ok, msg, data = activate_license(key, name)
-            QTimer.singleShot(0, lambda: self._on_verify_result(ok, msg, data))
+            try:
+                from core.licensing import activate_license
+                ok, msg, data = activate_license(key, name)
+            except Exception as exc:
+                ok, msg, data = False, str(exc), {}
+            self._verify_done.emit(ok, msg, data)
 
         threading.Thread(target=_bg_verify, daemon=True).start()
 
@@ -1614,7 +1619,7 @@ class LicenseActivationOverlay(QWidget):
             QTimer.singleShot(800, lambda: self.activated.emit(data))
         else:
             self._status_lbl.setStyleSheet("color: #ff5c8a; background: transparent;")
-            self._status_lbl.setText(f"Activation Failed: {msg}")
+            self._status_lbl.setText(f"❌ {msg}")
 
 
 class HueWheel(QWidget):

@@ -193,7 +193,7 @@ def activate_license(license_key: str, customer_name: str = "") -> tuple[bool, s
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=35) as resp:
             resp_data = json.loads(resp.read().decode("utf-8"))
 
         if resp_data.get("success"):
@@ -249,7 +249,7 @@ def heartbeat() -> dict:
             headers={"Content-Type": "application/json", "User-Agent": "BRONO-Client/1.0"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             resp_data = json.loads(resp.read().decode("utf-8"))
 
         if resp_data.get("revoked"):
