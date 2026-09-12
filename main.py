@@ -1806,6 +1806,15 @@ def main():
     def runner():
         ui.wait_for_api_key()
         jarvis = JarvisLive(ui)
+
+        # Start Telegram remote control listener (if configured)
+        try:
+            from actions.telegram_remote import start_telegram_listener
+            result = start_telegram_listener(ui)
+            print(f"[BRONO] {result}")
+        except Exception as _tg_err:
+            print(f"[BRONO] Telegram remote skipped: {_tg_err}")
+
         try:
             asyncio.run(jarvis.run())
         except KeyboardInterrupt:

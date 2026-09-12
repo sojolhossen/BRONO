@@ -90,58 +90,118 @@ def _restore_from_trash(original: Path) -> str:
             f"automatically, but it is there and can be restored by hand.")
 
 
-_SAFE_ROOTS: list[Path] = [
-    Path.home(),
-]
+def _is_blocked_system_path(target: Path) -> bool:
+    """Check if the target is a critical OS/system directory that must be protected."""
+    try:
+        res = target.resolve()
+        # Protect root drive itself from direct destruction (e.g. C:\ or D:\ or /)
+        if len(res.parts) <= 1:
+            return True
+
+        res_str = str(res).lower().replace("\\", "/")
+
+        if _OS == "Windows":
+            sys_drive = os.environ.get("SystemDrive", "C:").lower()
+            windir = os.environ.get("SystemRoot", f"{sys_drive}/windows").lower().replace("\\", "/")
+            prog_files = os.environ.get("ProgramFiles", f"{sys_drive}/program files").lower().replace("\\", "/")
+            prog_files_x86 = os.environ.get("ProgramFiles(x86)", f"{sys_drive}/program files (x86)").lower().replace("\\", "/")
+
+            # Block critical Windows system root directories
+            if res_str.startswith(windir) or res_str.startswith(prog_files) or res_str.startswith(prog_files_x86):
+                return True
+            if any(part.lower() in ("$recycle.bin", "system volume information", "recovery") for part in res.parts):
+                return True
+        else:
+            blocked_prefixes = ("/bin", "/sbin", "/etc", "/usr", "/lib", "/sys", "/proc", "/dev", "/boot", "/System")
+            if any(res_str == p or res_str.startswith(p + "/") for p in blocked_prefixes):
+                return True
+        return False
+    except Exception:
+        return True
+
 
 def _is_safe_path(target: Path) -> bool:
-    """Is the given path inside _SAFE_ROOTS? If not, reject the operation."""
+    """Safe path checker allowing all user drives (C:, D:, E: etc.), user profiles,
+    desktop, documents, downloads, and custom directories while blocking critical OS system files."""
     try:
         resolved = target.resolve()
-        return any(
-            resolved == root.resolve() or resolved.is_relative_to(root.resolve())
-            for root in _SAFE_ROOTS
-        )
+        if _is_blocked_system_path(resolved):
+            return False
+        return True
     except Exception:
         return False
 
+
+def _get_windows_folder(folder_name: str, fallback_sub: str) -> Path:
+    if _OS == "Windows":
+        try:
+            import winreg
+            with winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders") as key:
+                val, _t = winreg.QueryValueEx(key, folder_name)
+            p = Path(os.path.expandvars(val))
+            if p.is_dir():
+                return p
+        except Exception:
+            pass
+    return Path.home() / fallback_sub
+
+
 def _get_desktop() -> Path:
-    if _OS == "Linux":
+    if _OS == "Windows":
+        return _get_windows_folder("Desktop", "Desktop")
+    elif _OS == "Linux":
         xdg = os.environ.get("XDG_DESKTOP_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
     return Path.home() / "Desktop"
 
+
 def _get_downloads() -> Path:
-    if _OS == "Linux":
+    if _OS == "Windows":
+        return _get_windows_folder("{374DE290-123F-4565-9164-39C4925E467B}", "Downloads")
+    elif _OS == "Linux":
         xdg = os.environ.get("XDG_DOWNLOAD_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
     return Path.home() / "Downloads"
 
+
 def _get_documents() -> Path:
-    if _OS == "Linux":
+    if _OS == "Windows":
+        return _get_windows_folder("Personal", "Documents")
+    elif _OS == "Linux":
         xdg = os.environ.get("XDG_DOCUMENTS_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
     return Path.home() / "Documents"
 
+
 def _get_pictures() -> Path:
-    if _OS == "Linux":
+    if _OS == "Windows":
+        return _get_windows_folder("My Pictures", "Pictures")
+    elif _OS == "Linux":
         xdg = os.environ.get("XDG_PICTURES_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
     return Path.home() / "Pictures"
 
+
 def _get_music() -> Path:
-    if _OS == "Linux":
+    if _OS == "Windows":
+        return _get_windows_folder("My Music", "Music")
+    elif _OS == "Linux":
         xdg = os.environ.get("XDG_MUSIC_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
     return Path.home() / "Music"
 
+
 def _get_videos() -> Path:
-    if _OS == "Linux":
+    if _OS == "Windows":
+        return _get_windows_folder("My Video", "Videos")
+    elif _OS == "Linux":
         xdg = os.environ.get("XDG_VIDEOS_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
@@ -149,6 +209,8 @@ def _get_videos() -> Path:
 
 
 def _resolve_path(raw: str) -> Path:
+    if not raw or raw.strip() in ("", ".", "current", "here"):
+        return _get_desktop()
     shortcuts: dict[str, Path] = {
         "desktop":   _get_desktop(),
         "downloads": _get_downloads(),
@@ -158,10 +220,24 @@ def _resolve_path(raw: str) -> Path:
         "videos":    _get_videos(),
         "home":      Path.home(),
     }
-    lower = raw.strip().lower()
+    cleaned = raw.strip()
+    lower = cleaned.lower().replace("\\", "/")
+
+    # Direct shortcut match
     if lower in shortcuts:
         return shortcuts[lower]
-    return Path(raw).expanduser()
+
+    # Shortcut prefix match like "desktop/test.txt" or "downloads/subfolder"
+    for k, v in shortcuts.items():
+        if lower.startswith(f"{k}/"):
+            remainder = cleaned[len(k)+1:]
+            return v / remainder
+
+    p = Path(cleaned).expanduser()
+    if not p.is_absolute():
+        p = _get_desktop() / p
+    return p
+
 
 def _format_size(b: int) -> str:
     for unit in ["B", "KB", "MB", "GB", "TB"]:
@@ -170,8 +246,8 @@ def _format_size(b: int) -> str:
         b /= 1024
     return f"{b:.1f} TB"
 
-def _safe_trash(target: Path) -> str:
 
+def _safe_trash(target: Path) -> str:
     if not _SEND2TRASH:
         return (
             "send2trash is not installed. "
@@ -186,7 +262,7 @@ def list_files(path: str = "desktop", show_hidden: bool = False) -> str:
     try:
         target = _resolve_path(path)
         if not _is_safe_path(target):
-            return f"Access denied: {target}"
+            return f"Access denied: {target} is a protected system directory."
         if not target.exists():
             return f"Path not found: {target}"
         if not target.is_dir():
@@ -208,17 +284,22 @@ def list_files(path: str = "desktop", show_hidden: bool = False) -> str:
         return f"Contents of {target.name}/ ({len(items)} items):\n" + "\n".join(items)
 
     except PermissionError:
-        return f"Permission denied: {path}"
+        return f"Permission denied by OS: {path}"
     except Exception as e:
         return f"Error listing files: {e}"
 
 
 def create_file(path: str, name: str = "", content: str = "") -> str:
     try:
-        base   = _resolve_path(path)
-        target = (base / name) if name else base
+        base = _resolve_path(path)
+        if name:
+            target = (base / name) if (base.is_dir() or not base.suffix) else (base.parent / name)
+        else:
+            target = base
+
         if not _is_safe_path(target):
-            return f"Access denied: {target}"
+            return f"Access denied: {target} is in a protected system directory."
+
         target.parent.mkdir(parents=True, exist_ok=True)
         existed = target.exists()
         previous = None
@@ -230,25 +311,31 @@ def create_file(path: str, name: str = "", content: str = "") -> str:
         target.write_text(content, encoding="utf-8")
         push_undo(f"created {target.name}",
                   _undo_write(target, previous) if existed else _undo_create(target))
-        return f"File created: {target.name}"
+        return f"File created: {target.name} in {target.parent}"
+    except PermissionError:
+        return f"Permission denied by OS for {path}. The file might be open or locked."
     except Exception as e:
         return f"Could not create file: {e}"
 
 
 def create_folder(path: str, name: str = "") -> str:
     try:
-        base   = _resolve_path(path)
-        target = (base / name) if name else base
+        base = _resolve_path(path)
+        if name:
+            target = base / name
+        else:
+            target = base
+
         if not _is_safe_path(target):
-            return f"Access denied: {target}"
+            return f"Access denied: {target} is in a protected system directory."
+
         already = target.exists()
         target.mkdir(parents=True, exist_ok=True)
-        # Only offer to undo a folder we actually made. "mkdir -p" on something
-        # that was already there is not a change, and undoing it would delete a
-        # directory the user has had for years.
         if not already:
             push_undo(f"created folder {target.name}", _undo_create(target))
-        return f"Folder created: {target.name}"
+        return f"Folder created: {target.name} in {target.parent}"
+    except PermissionError:
+        return f"Permission denied by OS for {path}."
     except Exception as e:
         return f"Could not create folder: {e}"
 

@@ -106,15 +106,39 @@ class InstallWorker(QThread):
 
             # Terminate running BRONO if any
             try:
-                subprocess.run(["taskkill", "/F", "/IM", "BRONO.exe"], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "Windows" else 0)
+                subprocess.run(
+                    ["taskkill", "/F", "/IM", "BRONO.exe"],
+                    capture_output=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "Windows" else 0
+                )
+                time.sleep(1.5)  # Give OS time to release file handles
             except Exception:
                 pass
 
             target_dir = get_install_target_dir()
+
+            # Remove existing installation directory if it exists
+            # (handles locked files from previous incomplete installs)
+            if target_dir.exists():
+                self.progress.emit(15, "Removing previous installation...")
+                try:
+                    def _remove_readonly(fn, path, exc):
+                        import stat
+                        try:
+                            os.chmod(path, stat.S_IWRITE)
+                            fn(path)
+                        except Exception:
+                            pass
+                    shutil.rmtree(str(target_dir), onerror=_remove_readonly)
+                    time.sleep(0.5)
+                except Exception as rm_err:
+                    # If we can't fully remove, try to continue anyway
+                    print(f"[Installer] Warning - could not fully remove old dir: {rm_err}")
+
             target_dir.mkdir(parents=True, exist_ok=True)
 
             self.progress.emit(25, "Extracting application packages...")
-            
+
             # Find payload zip
             payload_zip = None
             if getattr(sys, "frozen", False):
@@ -128,13 +152,21 @@ class InstallWorker(QThread):
                 elif (base / "dist" / "BRONO").exists():
                     # Fallback: direct copy if running unpacked
                     self.progress.emit(40, "Copying application binaries...")
-                    shutil.copytree(base / "dist" / "BRONO", target_dir, dirs_exist_ok=True)
+                    shutil.copytree(str(base / "dist" / "BRONO"), str(target_dir), dirs_exist_ok=True)
 
             if payload_zip and payload_zip.exists():
                 with zipfile.ZipFile(payload_zip, "r") as zf:
                     total_files = len(zf.namelist())
                     for idx, item in enumerate(zf.namelist(), 1):
-                        zf.extract(item, target_dir)
+                        try:
+                            zf.extract(item, str(target_dir))
+                        except PermissionError:
+                            # Try with forced write permission on destination
+                            dest = target_dir / item
+                            if dest.exists():
+                                import stat as _stat
+                                os.chmod(str(dest), _stat.S_IWRITE | _stat.S_IREAD)
+                                zf.extract(item, str(target_dir))
                         if idx % 10 == 0:
                             pct = 25 + int((idx / total_files) * 50)
                             self.progress.emit(pct, f"Installing {Path(item).name}...")
@@ -151,6 +183,9 @@ class InstallWorker(QThread):
             self.progress.emit(100, "Installation complete!")
             time.sleep(0.5)
             self.finished.emit(True, str(exe_path))
+
+        except PermissionError as pe:
+            self.finished.emit(False, f"Permission denied: {pe}\n\nPlease close any running BRONO windows and try again.")
 
         except Exception as e:
             self.finished.emit(False, str(e))

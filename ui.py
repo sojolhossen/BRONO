@@ -1743,7 +1743,7 @@ class CustomizeOverlay(QWidget):
     """Floating overlay — change assistant name, user name, UI colour and voice."""
 
     saved = pyqtSignal(str, str, str, str)   # assistant_name, user_name, ui_color, voice
-    _OW, _OH = 400, 588
+    _OW, _OH = 400, 720
 
     def __init__(self, assistant_name="BRONO", user_name="",
                  ui_color=DEFAULT_UI_COLOR, voice="", parent=None):
@@ -1859,6 +1859,80 @@ class CustomizeOverlay(QWidget):
         lay.addWidget(self._hex_input)
 
         lay.addSpacing(6)
+
+        # ── Telegram Remote Control setup ────────────────────────────────────
+        tg_sep = QFrame(); tg_sep.setFrameShape(QFrame.Shape.HLine)
+        tg_sep.setStyleSheet(f"color: {C.BORDER}; margin: 2px 0;")
+        lay.addWidget(tg_sep)
+        lay.addWidget(_lbl("📱  TELEGRAM REMOTE CONTROL", 8, bold=True,
+                           color=C.PRI, align=Qt.AlignmentFlag.AlignLeft))
+        lay.addWidget(_lbl("Get files & screenshots on your phone via Telegram bot", 7,
+                           color=C.TEXT_DIM, align=Qt.AlignmentFlag.AlignLeft))
+
+        # Load existing telegram config
+        _cur_tg_token = ""
+        _cur_tg_chat  = ""
+        try:
+            _cfg = json.loads(API_FILE.read_text(encoding="utf-8")) if API_FILE.exists() else {}
+            _cur_tg_token = _cfg.get("telegram_bot_token", "")
+            _cur_tg_chat  = str(_cfg.get("telegram_chat_id", ""))
+        except Exception:
+            pass
+
+        lay.addWidget(_lbl("BOT TOKEN  (from @BotFather)", 7,
+                           color=C.TEXT_DIM, align=Qt.AlignmentFlag.AlignLeft))
+        self._tg_token_input = QLineEdit(_cur_tg_token)
+        self._tg_token_input.setPlaceholderText("1234567890:ABCdefGHIjkl...")
+        self._tg_token_input.setFont(QFont("Courier New", 8))
+        self._tg_token_input.setFixedHeight(28)
+        self._tg_token_input.setStyleSheet(_fs)
+        self._tg_token_input.setEchoMode(QLineEdit.EchoMode.Password)
+        lay.addWidget(self._tg_token_input)
+
+        lay.addWidget(_lbl("YOUR CHAT ID", 7,
+                           color=C.TEXT_DIM, align=Qt.AlignmentFlag.AlignLeft))
+        self._tg_chat_input = QLineEdit(_cur_tg_chat)
+        self._tg_chat_input.setPlaceholderText("e.g.  123456789")
+        self._tg_chat_input.setFont(QFont("Courier New", 8))
+        self._tg_chat_input.setFixedHeight(28)
+        self._tg_chat_input.setStyleSheet(_fs)
+        lay.addWidget(self._tg_chat_input)
+
+        tg_btn_row = QHBoxLayout(); tg_btn_row.setSpacing(6)
+        self._tg_status_lbl = QLabel("")
+        self._tg_status_lbl.setFont(QFont("Courier New", 7))
+        self._tg_status_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        self._tg_status_lbl.setWordWrap(True)
+
+        save_tg_btn = QPushButton("💾  SAVE")
+        save_tg_btn.setFixedHeight(26)
+        save_tg_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        save_tg_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        save_tg_btn.setStyleSheet(f"""
+            QPushButton {{ background: transparent; color: {C.PRI};
+                border: 1px solid {C.PRI_DIM}; border-radius: 3px; }}
+            QPushButton:hover {{ background: {C.PRI_GHO}; border: 1px solid {C.PRI}; }}
+        """)
+        save_tg_btn.clicked.connect(self._save_telegram_config)
+
+        test_tg_btn = QPushButton("📡  TEST")
+        test_tg_btn.setFixedHeight(26)
+        test_tg_btn.setFont(QFont("Courier New", 8))
+        test_tg_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        test_tg_btn.setStyleSheet(f"""
+            QPushButton {{ background: transparent; color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER}; border-radius: 3px; }}
+            QPushButton:hover {{ color: {C.TEXT}; border-color: {C.BORDER_B}; }}
+        """)
+        test_tg_btn.clicked.connect(self._test_telegram)
+
+        tg_btn_row.addWidget(save_tg_btn)
+        tg_btn_row.addWidget(test_tg_btn)
+        tg_btn_row.addStretch()
+        lay.addLayout(tg_btn_row)
+        lay.addWidget(self._tg_status_lbl)
+
+        lay.addSpacing(6)
         btn_row = QHBoxLayout(); btn_row.setSpacing(8)
 
         save_btn = QPushButton("▸  APPLY CHANGES")
@@ -1949,6 +2023,68 @@ class CustomizeOverlay(QWidget):
         if self.on_preview and self._sel_color != self._initial_color:
             self.on_preview(self._initial_color)
         self.hide()
+
+    def _save_telegram_config(self):
+        """Save Telegram bot token and chat ID to config."""
+        token = self._tg_token_input.text().strip()
+        chat  = self._tg_chat_input.text().strip()
+        if not token or not chat:
+            self._tg_status_lbl.setStyleSheet("color: #ff4444; background: transparent;")
+            self._tg_status_lbl.setText("⚠ Please enter both Bot Token and Chat ID.")
+            return
+        try:
+            cfg = json.loads(API_FILE.read_text(encoding="utf-8")) if API_FILE.exists() else {}
+            cfg["telegram_bot_token"] = token
+            cfg["telegram_chat_id"]   = chat
+            API_FILE.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+            # Restart listener in background
+            def _restart():
+                try:
+                    from actions.telegram_remote import stop_telegram_listener, start_telegram_listener
+                    stop_telegram_listener()
+                    time.sleep(0.8)
+                    start_telegram_listener()
+                except Exception:
+                    pass
+            threading.Thread(target=_restart, daemon=True).start()
+            self._tg_status_lbl.setStyleSheet(f"color: #00ff88; background: transparent;")
+            self._tg_status_lbl.setText("✅ Saved! Telegram listener restarted.")
+        except Exception as e:
+            self._tg_status_lbl.setStyleSheet("color: #ff4444; background: transparent;")
+            self._tg_status_lbl.setText(f"❌ Error: {e}")
+
+    def _test_telegram(self):
+        """Send a test message to validate Telegram credentials."""
+        token = self._tg_token_input.text().strip()
+        chat  = self._tg_chat_input.text().strip()
+        if not token or not chat:
+            self._tg_status_lbl.setStyleSheet("color: #ff4444; background: transparent;")
+            self._tg_status_lbl.setText("⚠ Enter Bot Token and Chat ID first.")
+            return
+        self._tg_status_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        self._tg_status_lbl.setText("📡 Sending test message...")
+
+        def _do_test():
+            try:
+                import urllib.request
+                import json as _json
+                url  = f"https://api.telegram.org/bot{token}/sendMessage"
+                body = _json.dumps({"chat_id": chat, "text": "🤖 BRONO Telegram Remote — Connection OK!"}).encode()
+                req  = urllib.request.Request(url, data=body,
+                                              headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    resp = _json.loads(r.read())
+                if resp.get("ok"):
+                    self._tg_status_lbl.setStyleSheet("color: #00ff88; background: transparent;")
+                    self._tg_status_lbl.setText("✅ Test message sent! Check your Telegram.")
+                else:
+                    self._tg_status_lbl.setStyleSheet("color: #ff4444; background: transparent;")
+                    self._tg_status_lbl.setText(f"❌ {resp.get('description', 'Unknown error')}")
+            except Exception as ex:
+                self._tg_status_lbl.setStyleSheet("color: #ff4444; background: transparent;")
+                self._tg_status_lbl.setText(f"❌ {ex}")
+
+        threading.Thread(target=_do_test, daemon=True).start()
 
     def _save(self):
         name = self._name_input.text().strip() or "BRONO"
