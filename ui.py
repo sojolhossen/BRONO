@@ -40,8 +40,8 @@ from PyQt6.QtWidgets import (
 # Mark 52 and 53 shipped showing "PROTOCOL XLIX" — the number from Mark 49 — and
 # Mark 55 shipped titled "MARK 54". Deriving the protocol from the name means a
 # release bump is this one line.
-APP_VERSION  = "MARK LIII"
-APP_PROTOCOL = APP_VERSION.split()[-1]
+APP_VERSION  = "ENTERPRISE"
+APP_PROTOCOL = "V1"
 
 def _base_dir() -> Path:
     if getattr(sys, "frozen", False):
@@ -705,10 +705,10 @@ class HudCanvas(QWidget):
         # Corner Telemetry Labels
         p.setFont(get_font(6, bold=True, mono=True))
         p.setPen(QPen(qcol(C.TEXT_DIM, 180), 1))
-        p.drawText(QRectF(hl + 8, ht + 4, 180, 14), Qt.AlignmentFlag.AlignLeft, "◈ MARK-LIII // SEC.CLEARED")
+        p.drawText(QRectF(hl + 8, ht + 4, 180, 14), Qt.AlignmentFlag.AlignLeft, "◈ BRONO-AI // SEC.CLEARED")
         p.drawText(QRectF(hr - 188, ht + 4, 180, 14), Qt.AlignmentFlag.AlignRight, "AI CORE // FREQ: 4.8 GHz")
         p.drawText(QRectF(hl + 8, hb - 18, 180, 14), Qt.AlignmentFlag.AlignLeft, "AUDIO FLUX // 48.0 kHz")
-        p.drawText(QRectF(hr - 188, hb - 18, 180, 14), Qt.AlignmentFlag.AlignRight, "PROTOCOL // LIII ACTIVE")
+        p.drawText(QRectF(hr - 188, hb - 18, 180, 14), Qt.AlignmentFlag.AlignRight, "PROTOCOL // V1 ACTIVE")
 
         # ── 10. Arc Reactor Core / Face Presentation ───────────────────────
         if self._face_px:
@@ -1550,7 +1550,7 @@ class LicenseActivationOverlay(QWidget):
         # Customer Name input (optional)
         layout.addWidget(_lbl("CUSTOMER / COMPANY NAME (OPTIONAL)", 8, color=C.TEXT_DIM, align=Qt.AlignmentFlag.AlignLeft))
         self._name_input = QLineEdit()
-        self._name_input.setPlaceholderText("e.g. John Doe / Mark Studio")
+        self._name_input.setPlaceholderText("e.g. John Doe / BRONO Studio")
         self._name_input.setFont(QFont("Courier New", 9))
         self._name_input.setFixedHeight(30)
         self._name_input.setStyleSheet(f"""
@@ -4300,7 +4300,7 @@ class MainWindow(QMainWindow):
 
         lay.addWidget(_fl("[F4] Mute  ·  [F11] Fullscreen  ·  [ESC] Interrupt"))
         lay.addStretch()
-        lay.addWidget(_fl("MARK LIII  //  FatihMakes", C.PRI_DIM))
+        lay.addWidget(_fl("BRONO  //  Enterprise AI", C.PRI_DIM))
         return w
 
     def _on_file_selected(self, path: str):
@@ -4905,8 +4905,10 @@ class MainWindow(QMainWindow):
 
     def _on_setup_done(self, key: str, os_name: str):
         os.makedirs(CONFIG_DIR, exist_ok=True)
+        cfg = _read_full_config()
+        cfg.update({"gemini_api_key": key, "os_system": os_name})
         API_FILE.write_text(
-            json.dumps({"gemini_api_key": key, "os_system": os_name}, indent=4),
+            json.dumps(cfg, indent=4),
             encoding="utf-8",
         )
         self._ready = True

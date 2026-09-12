@@ -57,17 +57,31 @@ def main():
                     shutil.rmtree(target_dir)
                 shutil.copytree(src, target_dir, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
 
-    # Ensure clean config directory exists with live license server URL
+    # Ensure config directory exists in dist
     dist_config = DIST_DIR / "config"
     dist_config.mkdir(parents=True, exist_ok=True)
     
+    # Preserve license token if activated on this machine
+    src_license = BASE_DIR / "config" / "license.dat"
+    if src_license.exists():
+        shutil.copy2(src_license, dist_config / "license.dat")
+
+    import json
+    dist_api_file = dist_config / "api_keys.json"
     clean_config = {
         "license_server_url": "https://brono.onrender.com",
         "assistant_name": "BRONO",
         "os_system": "windows"
     }
-    import json
-    (dist_config / "api_keys.json").write_text(json.dumps(clean_config, indent=4), encoding="utf-8")
+    src_api = BASE_DIR / "config" / "api_keys.json"
+    if src_api.exists():
+        try:
+            cur = json.loads(src_api.read_text(encoding="utf-8"))
+            if cur.get("gemini_api_key"):
+                clean_config["gemini_api_key"] = cur["gemini_api_key"]
+        except Exception:
+            pass
+    dist_api_file.write_text(json.dumps(clean_config, indent=4), encoding="utf-8")
 
     print("\n" + "=" * 65)
     print("  🎉 BRONO BUILD COMPLETE!")

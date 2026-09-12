@@ -113,5 +113,20 @@ def init_db():
             ("admin", hash_password("admin123"), now)
         )
 
+    # Seed permanent Master Enterprise licenses so they persist across container rebuilds
+    now = datetime.utcnow().isoformat()
+    permanent_licenses = [
+        ("BRONO-QEVS-RCGJ-WH7W-KJNZ", "SOJOL", "sojol@mark.ai", "enterprise", 10, "active", "Master Owner Enterprise Lifetime License", None),
+        ("BRONO-PJY3-23K5-U9N5-PPZS", "sojol", "sojolstudent66@gmail.com", "trial", 5, "active", "Trial 7 Days License", None),
+        ("BRONO-MASTER-2026-SOJOL-PRO", "SOJOL", "sojol@mark.ai", "enterprise", 10, "active", "Master Pro Developer Lifetime", None),
+    ]
+    for key, name, email, plan, max_dev, st, notes, exp in permanent_licenses:
+        c.execute("SELECT id FROM licenses WHERE license_key = ?", (key,))
+        if not c.fetchone():
+            c.execute("""
+            INSERT INTO licenses (license_key, customer_name, customer_email, plan, max_devices, status, notes, expires_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (key, name, email, plan, max_dev, st, notes, exp, now, now))
+
     conn.commit()
     conn.close()

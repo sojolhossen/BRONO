@@ -117,17 +117,72 @@ def verify_token(token: str) -> dict | None:
     except Exception:
         return None
 
+def _get_appdata_file() -> Path:
+    appdata = os.getenv("APPDATA")
+    if appdata:
+        p = Path(appdata) / "BRONO"
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            return p / "license.dat"
+        except Exception:
+            pass
+    return LICENSE_FILE
+
+def _get_registry_token() -> str | None:
+    if platform.system().lower() == "windows":
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\BRONO") as key:
+                val, _ = winreg.QueryValueEx(key, "LicenseToken")
+                return str(val).strip()
+        except Exception:
+            pass
+    return None
+
+def _set_registry_token(token: str) -> None:
+    if platform.system().lower() == "windows":
+        try:
+            import winreg
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\BRONO") as key:
+                winreg.SetValueEx(key, "LicenseToken", 0, winreg.REG_SZ, token.strip())
+        except Exception:
+            pass
+
 def check_local_license() -> tuple[bool, str, dict]:
     """
     Validates the local cached license token without needing constant internet.
+    Checks local config file, AppData directory, and Windows Registry.
     Returns: (is_valid, status_or_reason, license_data)
     """
     global _CACHED_LICENSE
-    if not LICENSE_FILE.exists():
+
+    token = ""
+    # Tier 1: Local CONFIG_DIR / license.dat
+    if LICENSE_FILE.exists():
+        try:
+            token = LICENSE_FILE.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
+
+    # Tier 2: %APPDATA%/BRONO/license.dat
+    if not token:
+        af = _get_appdata_file()
+        if af.exists():
+            try:
+                token = af.read_text(encoding="utf-8").strip()
+            except Exception:
+                pass
+
+    # Tier 3: Windows Registry HKCU\Software\BRONO\LicenseToken
+    if not token:
+        reg_tok = _get_registry_token()
+        if reg_tok:
+            token = reg_tok
+
+    if not token:
         return False, "NO_LICENSE", {}
 
     try:
-        token = LICENSE_FILE.read_text(encoding="utf-8").strip()
         data = verify_token(token)
         if not data:
             return False, "INVALID_TOKEN", {}
@@ -152,19 +207,43 @@ def check_local_license() -> tuple[bool, str, dict]:
             if datetime.utcnow() - last_date > timedelta(days=7):
                 return False, "GRACE_EXPIRED", data
 
+        # Keep all storage locations in sync so one-time activation is permanent
+        if not LICENSE_FILE.exists():
+            try:
+                CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+                LICENSE_FILE.write_text(token, encoding="utf-8")
+            except Exception:
+                pass
+
         _CACHED_LICENSE = data
         return True, "ACTIVE", data
     except Exception as e:
         return False, f"ERROR_{e}", {}
 
 def save_license_token(token: str) -> bool:
-    """Save valid signed token to disk."""
+    """Save valid signed token to local file, AppData, and Windows Registry."""
+    token = token.strip()
+    saved = False
+
+    # 1. Local CONFIG_DIR
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        LICENSE_FILE.write_text(token.strip(), encoding="utf-8")
-        return True
+        LICENSE_FILE.write_text(token, encoding="utf-8")
+        saved = True
     except Exception:
-        return False
+        pass
+
+    # 2. Windows AppData
+    try:
+        af = _get_appdata_file()
+        af.write_text(token, encoding="utf-8")
+        saved = True
+    except Exception:
+        pass
+
+    # 3. Windows Registry
+    _set_registry_token(token)
+    return saved
 
 def activate_license(license_key: str, customer_name: str = "") -> tuple[bool, str, dict]:
     """
