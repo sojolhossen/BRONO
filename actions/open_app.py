@@ -79,41 +79,64 @@ def _normalize(raw: str) -> str:
 
 def _launch_windows(app_name: str) -> bool:
 
-    if shutil.which(app_name) or shutil.which(app_name.split(".")[0]):
-        try:
-            subprocess.Popen(
-                app_name,
-                shell=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+    # Strategy 1: Direct shell launch (works for PATH apps, .exe, URLs, ms-settings:)
+    try:
+        subprocess.Popen(
+            app_name,
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
+        time.sleep(1.5)
+        return True
+    except Exception:
+        pass
+
+    # Strategy 2: Windows ShellExecute via 'start' command (works for Store apps,
+    # registered apps, URIs like ms-settings:)
+    try:
+        subprocess.Popen(
+            f'start "" "{app_name}"',
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        time.sleep(1.5)
+        return True
+    except Exception:
+        pass
+
+    # Strategy 3: PowerShell Start-Process (broader app discovery)
+    try:
+        result = subprocess.run(
+            ["powershell", "-WindowStyle", "Hidden", "-Command",
+             f"Start-Process '{app_name}' -ErrorAction SilentlyContinue"],
+            capture_output=True,
+            timeout=8,
+        )
+        if result.returncode == 0:
             time.sleep(1.5)
             return True
-        except Exception as e:
-            print(f"[open_app] subprocess failed: {e}")
+    except Exception:
+        pass
 
-    if ":" in app_name:
-        try:
-            subprocess.Popen(f"start {app_name}", shell=True)
-            time.sleep(1.0)
-            return True
-        except Exception:
-            pass
-
+    # Strategy 4: Start Menu search via pyautogui (last resort)
     try:
         import pyautogui
         pyautogui.PAUSE = 0.1
         pyautogui.press("win")
-        time.sleep(0.7)
-        pyautogui.write(app_name, interval=0.05)
-        time.sleep(0.9)
+        time.sleep(0.8)
+        pyautogui.write(app_name, interval=0.06)
+        time.sleep(1.0)
         pyautogui.press("enter")
         time.sleep(2.5)
         return True
     except Exception as e:
-        print(f"[open_app] Start Menu search failed: {e}")
+        print(f"[open_app] All launch methods failed for '{app_name}': {e}")
 
     return False
+
 
 
 def _launch_macos(app_name: str) -> bool:

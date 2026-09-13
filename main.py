@@ -3,14 +3,19 @@ import subprocess as _subprocess
 
 # ── Nuclear: force CREATE_NO_WINDOW on EVERY subprocess call on Windows ───────
 # This patches Popen itself, so no per-file flag is needed anywhere.
+# EXCEPTION: if DETACHED_PROCESS is already set (e.g. open_app launching GUI
+# apps), we skip CREATE_NO_WINDOW so the app window can appear normally.
 if _platform.system() == "Windows":
     _OrigPopen = _subprocess.Popen
 
     class _Popen(_OrigPopen):
         def __init__(self, args, **kw):
-            kw["creationflags"] = kw.get("creationflags", 0) | _subprocess.CREATE_NO_WINDOW
+            flags = kw.get("creationflags", 0)
+            # Only add CREATE_NO_WINDOW if not launching a detached GUI process
+            if not (flags & _subprocess.DETACHED_PROCESS):
+                kw["creationflags"] = flags | _subprocess.CREATE_NO_WINDOW
             kw.pop("startupinfo", None)   # drop any stale/shared STARTUPINFO
-            super().__init__(args, **                       kw)
+            super().__init__(args, **kw)
 
     _subprocess.Popen = _Popen
 
