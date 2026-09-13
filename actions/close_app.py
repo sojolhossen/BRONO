@@ -123,6 +123,14 @@ def close_app(
         _close_active_window()
         return "Closed the current active window."
 
+    # If user asks to minimize
+    if "minimize" in clean:
+        if player and hasattr(player, "ui") and hasattr(player.ui, "minimize_window"):
+            player.ui.minimize_window()
+            return "BRONO window minimized."
+        _close_active_window()
+        return "Window minimized."
+
     candidates = [c.lower() for c in _get_target_process_names(app_name)]
     print(f"[close_app] Attempting to close '{app_name}' (candidates: {candidates})")
 

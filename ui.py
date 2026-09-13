@@ -5266,8 +5266,20 @@ class JarvisUI:
         except Exception:
             pass
 
-    def notify_phone_connected(self) -> None:
-        self._win.notify_phone_connected()
+    def minimize_window(self) -> None:
+        """Thread-safe: minimize the main BRONO window."""
+        QTimer.singleShot(0, self._win.showMinimized)
+
+    def maximize_window(self) -> None:
+        """Thread-safe: maximize/restore the main BRONO window."""
+        if self._win.isMaximized():
+            QTimer.singleShot(0, self._win.showNormal)
+        else:
+            QTimer.singleShot(0, self._win.showMaximized)
+
+    def restore_window(self) -> None:
+        """Thread-safe: restore the main BRONO window."""
+        QTimer.singleShot(0, self._win.showNormal)
 
     def set_state(self, state: str):
         self._win._state_sig.emit(state)

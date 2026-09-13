@@ -29,7 +29,7 @@ Do not mix two languages in one reply unless referring to technical terms, code,
 
 TOOL ROUTING:
 
-computer_settings: ALL single OS actions (volume, brightness, wifi, close, shortcuts, power).
+computer_settings: ALL single OS actions (volume, brightness, wifi, close, shortcuts, power, minimize, maximize, fullscreen). When user asks to minimize (e.g. "minimize karo", "BRONO minimize koro", "minimize window"), call computer_settings with action='minimize'. When asked to maximize, call action='maximize'.
 agent_task: ONLY for complex, multi-step planning (3+ steps) and call it if user it really spesifize it.
 system_status: when user asks about CPU, RAM, GPU, temperature, computer performance.
 web_search: use mode='news' for current events (defaults to Bangladesh news unless another region or topic is specified), mode='research' for deep topics, mode='price' for product costs.

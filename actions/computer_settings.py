@@ -257,8 +257,25 @@ def full_screen():
     else:               pyautogui.press("f11")
 
 def minimize_window():
-    if _OS == "Darwin": pyautogui.hotkey("command", "m")
-    else:               pyautogui.hotkey("win", "down")
+    if _OS == "Darwin":
+        pyautogui.hotkey("command", "m")
+    elif _OS == "Windows":
+        try:
+            import ctypes
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE = 6
+                return
+        except Exception:
+            pass
+        pyautogui.hotkey("win", "down")
+        time.sleep(0.05)
+        pyautogui.hotkey("win", "down")
+    else:
+        try:
+            subprocess.run(["wmctrl", "-r", ":ACTIVE:", "-b", "add,hidden"], capture_output=True)
+        except Exception:
+            pyautogui.hotkey("super", "h")
 
 def maximize_window():
     if _OS == "Darwin":
@@ -267,6 +284,14 @@ def maximize_window():
             'using {control down, command down}'],
             capture_output=True)
     elif _OS == "Windows":
+        try:
+            import ctypes
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE = 3
+                return
+        except Exception:
+            pass
         pyautogui.hotkey("win", "up")
     else:
         try:
@@ -706,6 +731,8 @@ _ALIASES = {
     "brightness_up":   ("brighter", "raise brightness", "increase brightness"),
     "brightness_down": ("dimmer", "dim", "lower brightness", "decrease brightness"),
     "close_window":    ("close this", "close it"),
+    "minimize":        ("minimize", "minimise", "minimize window", "minimize app", "minimize brono", "brono minimize", "choto koro", "minimize karo", "window minimize"),
+    "maximize":        ("maximize", "maximise", "maximize window", "boro koro", "full window"),
     "full_screen":     ("fullscreen", "maximise screen"),
     "show_desktop":    ("minimise everything", "go to desktop"),
     "lock_screen":     ("lock", "lock the pc", "lock computer"),
@@ -869,6 +896,20 @@ def computer_settings(
     if action == "scroll_down":
         scroll_down(int(value or 500))
         return "Scrolled down."
+
+    if action in ("minimize", "minimize_window"):
+        if player and hasattr(player, "ui") and hasattr(player.ui, "minimize_window"):
+            player.ui.minimize_window()
+            return "Window minimized."
+        minimize_window()
+        return "Window minimized."
+
+    if action in ("maximize", "maximize_window"):
+        if player and hasattr(player, "ui") and hasattr(player.ui, "maximize_window"):
+            player.ui.maximize_window()
+            return "Window maximized."
+        maximize_window()
+        return "Window maximized."
 
     func = ACTION_MAP.get(action)
     if not func:
