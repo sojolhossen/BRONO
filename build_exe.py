@@ -36,6 +36,9 @@ def main():
         "--hidden-import", "uvicorn",
         "--hidden-import", "cryptography",
         "--hidden-import", "duckduckgo_search",
+        "--hidden-import", "config",
+        "--hidden-import", "psutil",
+        "--add-data", "config.py;.",
         "main.py"
     ]
 
@@ -53,6 +56,10 @@ def main():
         shutil.copy2(BASE_DIR / "icon.ico", DIST_DIR / "icon.ico")
     if (BASE_DIR / "version.json").exists():
         shutil.copy2(BASE_DIR / "version.json", DIST_DIR / "version.json")
+
+    # Copy config.py to dist root and _internal (needed by game_updater, youtube_video etc.)
+    for cfg_dst in [DIST_DIR / "config.py", DIST_DIR / "_internal" / "config.py"]:
+        shutil.copy2(BASE_DIR / "config.py", cfg_dst)
 
     # Copy dynamic actions, plugins, and core folders into dist package
     for folder in ["actions", "plugins", "core"]:
